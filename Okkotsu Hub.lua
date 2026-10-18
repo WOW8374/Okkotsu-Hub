@@ -76,6 +76,115 @@ local gui = new("ScreenGui", {
 }, parent)
 
 ----------------------------------------------------------------
+-- NOVO: Sistema de key (bloqueia todo o resto do script até validar)
+----------------------------------------------------------------
+do
+    local VALID_KEY  = "GLOBAL_866328948"
+    local EXPIRES_AT = 1792906284 -- 25/10/2026 02:31:24 (Brasília) = exatamente 1 semana depois
+
+    local function nowTime()
+        local ok, t = pcall(function() return workspace:GetServerTimeNow() end)
+        if ok and type(t) == "number" then return t end
+        return os.time()
+    end
+
+    local keyFrame = new("Frame", {
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.fromOffset(0, 0), BackgroundColor3 = THEME.Bg, BorderSizePixel = 0,
+        ClipsDescendants = true, ZIndex = 300,
+    }, gui)
+    corner(keyFrame, 12)
+    new("UIStroke", {Color = THEME.Accent, Thickness = 1, Transparency = 0.4}, keyFrame)
+
+    new("TextLabel", {
+        Position = UDim2.fromOffset(0, 14), Size = UDim2.new(1, 0, 0, 24), BackgroundTransparency = 1,
+        Text = HUB_NAME, TextColor3 = THEME.Text, Font = Enum.Font.GothamBold, TextSize = 15, ZIndex = 301,
+    }, keyFrame)
+    local info = new("TextLabel", {
+        Position = UDim2.fromOffset(10, 42), Size = UDim2.new(1, -20, 0, 20), BackgroundTransparency = 1,
+        Text = "Digite sua key para continuar", TextColor3 = THEME.Sub,
+        Font = Enum.Font.GothamMedium, TextSize = 12, ZIndex = 301,
+    }, keyFrame)
+    local input = new("TextBox", {
+        Position = UDim2.fromOffset(20, 72), Size = UDim2.new(1, -40, 0, 34), BackgroundColor3 = THEME.Panel,
+        Text = "", PlaceholderText = "Key", PlaceholderColor3 = THEME.Sub, TextColor3 = THEME.Text,
+        Font = Enum.Font.GothamMedium, TextSize = 13, ClearTextOnFocus = false, ZIndex = 301,
+    }, keyFrame)
+    corner(input, 8)
+    local confirm = new("TextButton", {
+        Position = UDim2.fromOffset(20, 118), Size = UDim2.new(0.5, -26, 0, 32), BackgroundColor3 = THEME.Accent,
+        Text = "Validar", TextColor3 = THEME.Text, Font = Enum.Font.GothamBold, TextSize = 13,
+        AutoButtonColor = false, ZIndex = 301,
+    }, keyFrame)
+    corner(confirm, 8)
+    local cancel = new("TextButton", {
+        AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -20, 0, 118), Size = UDim2.new(0.5, -26, 0, 32),
+        BackgroundColor3 = THEME.Panel2, Text = "Cancelar", TextColor3 = THEME.Text,
+        Font = Enum.Font.GothamBold, TextSize = 13, AutoButtonColor = false, ZIndex = 301,
+    }, keyFrame)
+    corner(cancel, 8)
+    local getKey = new("TextButton", {
+        Position = UDim2.fromOffset(20, 160), Size = UDim2.new(1, -40, 0, 28), BackgroundColor3 = THEME.Panel,
+        Text = "Pegar a key no Discord (copiar link)", TextColor3 = THEME.Accent,
+        Font = Enum.Font.GothamMedium, TextSize = 12, AutoButtonColor = false, ZIndex = 301,
+    }, keyFrame)
+    corner(getKey, 8)
+    getKey.MouseButton1Click:Connect(function()
+        local fn = setclipboard or toclipboard
+        if fn then
+            pcall(fn, "https://discord.gg/J9Z9N6qsEc")
+            info.Text = "Link copiado! A key está no chat do Discord"
+            info.TextColor3 = THEME.Sub
+        else
+            info.Text = "https://discord.gg/J9Z9N6qsEc"
+            info.TextColor3 = THEME.Sub
+        end
+    end)
+
+    tween(keyFrame, 0.35, {Size = UDim2.fromOffset(320, 204)}, Enum.EasingStyle.Back)
+
+    local result = nil -- true = liberado | false = cancelado/expirado
+    local function submit()
+        if nowTime() >= EXPIRES_AT then
+            info.Text = "Esta key expirou."
+            info.TextColor3 = Color3.fromRGB(220, 70, 80)
+            task.wait(1.5)
+            result = false
+            return
+        end
+        if input.Text:gsub("^%s+", ""):gsub("%s+$", "") == VALID_KEY then
+            info.Text = "Key válida!"
+            info.TextColor3 = Color3.fromRGB(90, 220, 130)
+            task.wait(0.6)
+            result = true
+        else
+            info.Text = "Key inválida"
+            info.TextColor3 = Color3.fromRGB(220, 70, 80)
+        end
+    end
+    confirm.MouseButton1Click:Connect(submit)
+    input.FocusLost:Connect(function(enter) if enter then submit() end end)
+    cancel.MouseButton1Click:Connect(function() result = false end)
+
+    -- se a key já tiver expirado, avisa logo
+    if nowTime() >= EXPIRES_AT then
+        info.Text = "Esta key expirou."
+        info.TextColor3 = Color3.fromRGB(220, 70, 80)
+    end
+
+    while result == nil and gui.Parent do task.wait(0.1) end
+
+    if result ~= true then
+        gui:Destroy()
+        return
+    end
+
+    tween(keyFrame, 0.25, {Size = UDim2.fromOffset(0, 0)}, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+    task.wait(0.3)
+    keyFrame:Destroy()
+end
+
+----------------------------------------------------------------
 -- Estado
 ----------------------------------------------------------------
 local S = {
@@ -1391,6 +1500,33 @@ do
   if not __ok then
     warn("[Okkotsu Hub] erro na aba Efeitos: " .. tostring(__err))
     notify("Erro na aba Efeitos (F9)")
+  end
+end
+
+----------------------------------------------------------------
+-- NOVO - ABA: Discord
+----------------------------------------------------------------
+do
+  local __ok, __err = pcall(function()
+    local DISCORD_LINK = "https://discord.gg/J9Z9N6qsEc"
+
+    local t = createTab("Discord")
+    Section(t, "Servidor do Discord")
+
+    local row = new("Frame", {Size = UDim2.new(1, 0, 0, 60), BackgroundColor3 = THEME.Panel, BorderSizePixel = 0}, t)
+    corner(row, 8)
+    new("TextLabel", {
+        Position = UDim2.fromOffset(12, 0), Size = UDim2.new(1, -24, 1, 0), BackgroundTransparency = 1,
+        Text = "Entre na nossa comunidade:\n" .. DISCORD_LINK, TextColor3 = THEME.Text,
+        Font = Enum.Font.GothamMedium, TextSize = 13, TextWrapped = true,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, row)
+
+    Button(t, "Copiar link do Discord", function() copy(DISCORD_LINK, "Link do Discord") end)
+  end)
+  if not __ok then
+    warn("[Okkotsu Hub] erro na aba Discord: " .. tostring(__err))
+    notify("Erro na aba Discord (F9)")
   end
 end
 
