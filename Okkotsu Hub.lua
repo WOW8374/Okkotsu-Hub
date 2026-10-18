@@ -780,15 +780,64 @@ do
         end
     end)
 
-    -- 25. X-Ray
+    -- 25. X-Ray (OTIMIZADO: processa em lotes, sem travar, e acompanha peças novas)
+    local xrayParts, xrayConn, xrayToken = {}, nil, 0
+    local function xrayValid(p)
+        if not p:IsA("BasePart") or p:IsA("Terrain") then return false end
+        if p.Transparency >= 1 then return false end
+        local char = LP.Character
+        if char and p:IsDescendantOf(char) then return false end
+        local par = p.Parent
+        if par and par:FindFirstChildOfClass("Humanoid") then return false end
+        return true
+    end
     Toggle(t, "X-Ray (paredes transparentes)", function(v)
-        for _, p in ipairs(workspace:GetDescendants()) do
-            if p:IsA("BasePart") and not p:IsA("Terrain")
-                and not (LP.Character and p:IsDescendantOf(LP.Character))
-                and not (p.Parent and p.Parent:FindFirstChildOfClass("Humanoid")) then
-                p.LocalTransparencyModifier = v and 0.6 or 0
-            end
+        xrayToken += 1
+        local token = xrayToken
+        if xrayConn then xrayConn:Disconnect() xrayConn = nil end
+        if v then
+            -- peças criadas depois também ficam transparentes
+            xrayConn = workspace.DescendantAdded:Connect(function(d)
+                if token == xrayToken and xrayValid(d) then
+                    xrayParts[d] = true
+                    d.LocalTransparencyModifier = 0.6
+                end
+            end)
+            -- varredura em lotes (não congela o jogo)
+            task.spawn(function()
+                local all = workspace:GetDescendants()
+                for i = 1, #all do
+                    if token ~= xrayToken then return end
+                    local p = all[i]
+                    if not xrayParts[p] and xrayValid(p) then
+                        xrayParts[p] = true
+                        p.LocalTransparencyModifier = 0.6
+                    end
+                    if i % 300 == 0 then task.wait() end
+                end
+            end)
+        else
+            -- restauração também em lotes
+            local list = {}
+            for p in pairs(xrayParts) do list[#list + 1] = p end
+            xrayParts = {}
+            task.spawn(function()
+                for i = 1, #list do
+                    if token ~= xrayToken then return end
+                    local p = list[i]
+                    if p.Parent then p.LocalTransparencyModifier = 0 end
+                    if i % 300 == 0 then task.wait() end
+                end
+            end)
         end
+    end)
+    onCleanup(function()
+        xrayToken += 1
+        if xrayConn then xrayConn:Disconnect() xrayConn = nil end
+        for p in pairs(xrayParts) do
+            if p.Parent then p.LocalTransparencyModifier = 0 end
+        end
+        xrayParts = {}
     end)
 
     -- 26. Gráficos baixos
@@ -1096,6 +1145,260 @@ do
 end
 
 ----------------------------------------------------------------
+-- NOVO - ABA: Música
+-- Obs.: o Roblox só replica o som para os outros jogadores se o jogo
+-- permitir (o servidor filtra o que o cliente cria). O som é colocado
+-- no seu personagem com alcance enorme para ser ouvido por quem
+-- estiver recebendo a réplica.
+----------------------------------------------------------------
+do
+    local t = createTab("Música")
+    local SoundService = game:GetService("SoundService")
+
+    local sound = new("Sound", {
+        Name = "OkkMusic", Volume = 1, Looped = false,
+        RollOffMode = Enum.RollOffMode.Linear,
+        RollOffMinDistance = 10000, RollOffMaxDistance = 10000,
+    }, SoundService)
+
+    local shareMode = true
+    local function reparent()
+        local r = getHRP()
+        if shareMode and r then
+            sound.Parent = r
+        else
+            sound.Parent = SoundService
+        end
+    end
+
+    local idBox = TextInput(t, "ID da música (somente números)")
+
+    Button(t, "Tocar música", function()
+        local id = idBox.Text:match("%d+")
+        if not id then return notify("ID inválido") end
+        reparent()
+        sound:Stop()
+        sound.SoundId = "rbxassetid://" .. id
+        sound:Play()
+        notify("Tocando ID " .. id)
+    end)
+    Button(t, "Pausar / Continuar", function()
+        if sound.IsPaused then sound:Resume() else sound:Pause() end
+    end)
+    Button(t, "Parar música", function()
+        sound:Stop()
+        notify("Música parada")
+    end)
+
+    Slider(t, "Volume", 0, 100, 50, function(v) sound.Volume = v / 50 end)
+    Slider(t, "Velocidade (%)", 50, 200, 100, function(v) sound.PlaybackSpeed = v / 100 end)
+    Toggle(t, "Repetir (loop)", function(v) sound.Looped = v end)
+    local setShare = Toggle(t, "Tocar para todos (no personagem)", function(v)
+        shareMode = v
+        reparent()
+    end)
+    setShare(true)
+
+    connect(LP.CharacterAdded, function(c)
+        c:WaitForChild("HumanoidRootPart", 10)
+        task.wait(0.3)
+        reparent()
+    end)
+
+    onCleanup(function() sound:Destroy() end)
+end
+
+----------------------------------------------------------------
+-- NOVO - ABA: Aparência (copiar a skin de qualquer jogador)
+-- Obs.: a skin só aparece para todos se o jogo aceitar a mudança
+-- feita pelo cliente; caso contrário só você vê.
+----------------------------------------------------------------
+do
+    local t = createTab("Aparência")
+
+    local nickBox = TextInput(t, "Nick do jogador (qualquer conta)")
+    local keepId = nil
+
+    local function getUserId(name)
+        name = name:gsub("%s", "")
+        if name == "" then return nil end
+        local ok, id = pcall(function() return Players:GetUserIdFromNameAsync(name) end)
+        if ok and id then return id end
+        local p = findPlayer(name)
+        return p and p.UserId or nil
+    end
+
+    local function applySkin(userId)
+        local hum = getHum()
+        if not hum then return false end
+        local ok, desc = pcall(function() return Players:GetHumanoidDescriptionFromUserId(userId) end)
+        if not ok or not desc then return false end
+        return pcall(function() hum:ApplyDescription(desc) end)
+    end
+
+    Button(t, "Copiar skin do nick", function()
+        local id = getUserId(nickBox.Text)
+        if not id then return notify("Jogador não encontrado") end
+        notify("Aplicando skin...")
+        if applySkin(id) then
+            keepId = id
+            notify("Skin aplicada!")
+        else
+            notify("Falha ao aplicar a skin")
+        end
+    end)
+
+    Button(t, "Voltar à minha skin", function()
+        keepId = nil
+        if applySkin(LP.UserId) then notify("Skin original restaurada") else notify("Falha ao restaurar") end
+    end)
+
+    Toggle(t, "Manter skin ao renascer", function(v) S.keepSkin = v end)
+    connect(LP.CharacterAdded, function(c)
+        if S.keepSkin and keepId then
+            c:WaitForChild("Humanoid", 10)
+            task.wait(0.8)
+            applySkin(keepId)
+        end
+    end)
+end
+
+----------------------------------------------------------------
+-- NOVO - ABA: Efeitos (fogo azul/roxo/amarelo, brilho... + invisível)
+-- Obs.: os efeitos são colocados no seu personagem; os outros jogadores
+-- só os veem se o jogo replicar a mudança feita pelo cliente.
+----------------------------------------------------------------
+do
+    local t = createTab("Efeitos")
+    local active = {}
+
+    local function detach(tag)
+        local c = LP.Character
+        if not c then return end
+        for _, d in ipairs(c:GetDescendants()) do
+            if d.Name == "OKK_" .. tag then d:Destroy() end
+        end
+    end
+
+    local function attach(tag)
+        local build = active[tag]
+        local r = getHRP()
+        if not build or not r then return end
+        detach(tag)
+        for _, inst in ipairs(build()) do
+            inst.Name = "OKK_" .. tag
+            inst.Parent = r
+        end
+    end
+
+    local function effectToggle(label, tag, build)
+        Toggle(t, label, function(v)
+            if v then
+                active[tag] = build
+                attach(tag)
+            else
+                active[tag] = nil
+                detach(tag)
+            end
+        end)
+    end
+
+    local function fireBuilder(c1, c2)
+        return function()
+            return {new("Fire", {Color = c1, SecondaryColor = c2, Size = 9, Heat = 10})}
+        end
+    end
+
+    effectToggle("Fogo Azul", "FogoAzul",
+        fireBuilder(Color3.fromRGB(0, 110, 255), Color3.fromRGB(0, 220, 255)))
+    effectToggle("Fogo Roxo", "FogoRoxo",
+        fireBuilder(Color3.fromRGB(150, 0, 255), Color3.fromRGB(230, 120, 255)))
+    effectToggle("Fogo Amarelo", "FogoAmarelo",
+        fireBuilder(Color3.fromRGB(255, 225, 0), Color3.fromRGB(255, 140, 0)))
+    effectToggle("Fogo Arco-íris", "Rainbow",
+        fireBuilder(Color3.fromRGB(255, 0, 0), Color3.fromRGB(255, 160, 0)))
+
+    effectToggle("Brilho dourado", "Brilho", function()
+        local c = Color3.fromRGB(255, 235, 150)
+        return {
+            new("PointLight", {Color = c, Brightness = 4, Range = 24}),
+            new("Sparkles", {SparkleColor = c}),
+        }
+    end)
+    effectToggle("Faíscas roxas", "Faiscas", function()
+        return {new("Sparkles", {SparkleColor = Color3.fromRGB(170, 90, 255)})}
+    end)
+    effectToggle("Fumaça", "Fumaca", function()
+        return {new("Smoke", {Color = Color3.fromRGB(150, 150, 160), Size = 6, Opacity = 0.4, RiseVelocity = 3})}
+    end)
+    effectToggle("Aura neon", "Aura", function()
+        return {new("Highlight", {
+            Adornee = LP.Character, FillColor = THEME.Accent, OutlineColor = Color3.new(1, 1, 1),
+            FillTransparency = 0.5, DepthMode = Enum.HighlightDepthMode.Occluded,
+        })}
+    end)
+
+    -- Fogo arco-íris: troca a cor continuamente
+    connect(RunService.Heartbeat, function()
+        if not active.Rainbow then return end
+        local c = LP.Character
+        local f = c and c:FindFirstChild("OKK_Rainbow", true)
+        if f then
+            local h = (tick() % 4) / 4
+            f.Color = Color3.fromHSV(h, 1, 1)
+            f.SecondaryColor = Color3.fromHSV((h + 0.15) % 1, 1, 1)
+        end
+    end)
+
+    -- Reaplicar efeitos ao renascer
+    connect(LP.CharacterAdded, function(c)
+        c:WaitForChild("HumanoidRootPart", 10)
+        task.wait(0.5)
+        for tag in pairs(active) do attach(tag) end
+    end)
+
+    -- Modo invisível
+    local invisOn = false
+    local savedTransp = setmetatable({}, {__mode = "k"})
+    local function applyInvis(on)
+        local c = LP.Character
+        if not c then return end
+        for _, d in ipairs(c:GetDescendants()) do
+            if (d:IsA("BasePart") and d.Name ~= "HumanoidRootPart") or d:IsA("Decal") then
+                if on then
+                    if savedTransp[d] == nil then savedTransp[d] = d.Transparency end
+                    d.Transparency = 1
+                elseif savedTransp[d] ~= nil then
+                    d.Transparency = savedTransp[d]
+                    savedTransp[d] = nil
+                end
+            end
+        end
+        local h = getHum()
+        if h then
+            h.DisplayDistanceType = on and Enum.HumanoidDisplayDistanceType.None or Enum.HumanoidDisplayDistanceType.Viewer
+        end
+    end
+    Toggle(t, "Modo invisível", function(v)
+        invisOn = v
+        applyInvis(v)
+        notify(v and "Invisível ativado" or "Invisível desativado")
+    end)
+    task.spawn(function()
+        while gui.Parent do
+            if invisOn then applyInvis(true) end
+            task.wait(0.5)
+        end
+    end)
+
+    onCleanup(function()
+        invisOn = false
+        applyInvis(false)
+        for tag in pairs(active) do detach(tag) end
+    end)
+end
+
+----------------------------------------------------------------
 -- Minimizar / restaurar / fechar
 ----------------------------------------------------------------
 local pill = new("TextButton", {
@@ -1131,7 +1434,8 @@ connect(UIS.InputBegan, function(i, gp)
     if not gp and i.KeyCode == Enum.KeyCode.RightControl then setMinimized(not minimized) end
 end)
 
-btnClose.MouseButton1Click:Connect(function()
+-- (o corpo abaixo é o fechamento original; agora só roda depois da confirmação)
+local function doClose()
     tween(main, 0.3, {Size = UDim2.fromOffset(0, 0)}, Enum.EasingStyle.Back, Enum.EasingDirection.In)
     task.wait(0.32)
     for _, f in ipairs(cleanups) do pcall(f) end
@@ -1142,7 +1446,113 @@ btnClose.MouseButton1Click:Connect(function()
     if S.fullbright then for k, val in pairs(origLight) do Lighting[k] = val end end
     for _, c in ipairs(connections) do c:Disconnect() end
     gui:Destroy()
-end)
+end
+
+-- NOVO: aviso de confirmação ao clicar no "X"
+local confirmOpen = false
+local function askClose()
+    if confirmOpen then return end
+    confirmOpen = true
+
+    local inv = 1 / uiScale.Scale
+    local dim = new("TextButton", {
+        Size = UDim2.fromScale(inv, inv), BackgroundColor3 = Color3.new(0, 0, 0),
+        BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 150,
+    }, gui)
+    tween(dim, 0.25, {BackgroundTransparency = 0.45})
+
+    local box = new("Frame", {
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5 * inv, 0.5 * inv),
+        Size = UDim2.fromOffset(0, 0), BackgroundColor3 = THEME.Panel, BorderSizePixel = 0,
+        ClipsDescendants = true, ZIndex = 151,
+    }, dim)
+    corner(box, 12)
+    new("UIStroke", {Color = THEME.Accent, Thickness = 1, Transparency = 0.4}, box)
+
+    new("TextLabel", {
+        Position = UDim2.fromOffset(0, 16), Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1,
+        Text = "Fechar o script?", TextColor3 = THEME.Text, Font = Enum.Font.GothamBold, TextSize = 16,
+        ZIndex = 152,
+    }, box)
+    new("TextLabel", {
+        Position = UDim2.fromOffset(10, 44), Size = UDim2.new(1, -20, 0, 36), BackgroundTransparency = 1,
+        Text = "Todas as funções serão desativadas e o hub será removido.",
+        TextColor3 = THEME.Sub, Font = Enum.Font.GothamMedium, TextSize = 12, TextWrapped = true,
+        ZIndex = 152,
+    }, box)
+
+    local function closeDialog()
+        tween(box, 0.2, {Size = UDim2.fromOffset(0, 0)}, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+        tween(dim, 0.25, {BackgroundTransparency = 1})
+        task.delay(0.28, function() dim:Destroy() confirmOpen = false end)
+    end
+
+    local function dialogButton(text, x, color, cb)
+        local b = new("TextButton", {
+            AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(x, 0, 1, -14), Size = UDim2.fromOffset(110, 30),
+            BackgroundColor3 = color, Text = text, TextColor3 = THEME.Text,
+            Font = Enum.Font.GothamBold, TextSize = 13, AutoButtonColor = false, ZIndex = 152,
+        }, box)
+        corner(b, 8)
+        b.MouseEnter:Connect(function() tween(b, 0.15, {BackgroundTransparency = 0.2}) end)
+        b.MouseLeave:Connect(function() tween(b, 0.15, {BackgroundTransparency = 0}) end)
+        b.MouseButton1Click:Connect(cb)
+    end
+    dialogButton("Não", 0.3, THEME.Panel2, closeDialog)
+    dialogButton("Sim, fechar", 0.7, Color3.fromRGB(220, 70, 80), function()
+        dim:Destroy()
+        confirmOpen = false
+        doClose()
+    end)
+
+    tween(box, 0.3, {Size = UDim2.fromOffset(300, 130)}, Enum.EasingStyle.Back)
+end
+btnClose.MouseButton1Click:Connect(askClose)
+
+----------------------------------------------------------------
+-- NOVO: Tela de loading (rápida)
+----------------------------------------------------------------
+do
+    local inv = 1 / uiScale.Scale
+    local overlay = new("Frame", {
+        Size = UDim2.fromScale(inv, inv), BackgroundColor3 = THEME.Bg, BorderSizePixel = 0, ZIndex = 200,
+    }, gui)
+
+    local title = new("TextLabel", {
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.44),
+        Size = UDim2.fromOffset(420, 30), BackgroundTransparency = 1, Text = HUB_NAME,
+        TextColor3 = THEME.Text, Font = Enum.Font.GothamBold, TextSize = 22, ZIndex = 201,
+    }, overlay)
+    local status = new("TextLabel", {
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.52),
+        Size = UDim2.fromOffset(300, 20), BackgroundTransparency = 1, Text = "Carregando...",
+        TextColor3 = THEME.Sub, Font = Enum.Font.GothamMedium, TextSize = 13, ZIndex = 201,
+    }, overlay)
+    local barBg = new("Frame", {
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.58),
+        Size = UDim2.fromOffset(260, 6), BackgroundColor3 = THEME.Off, BorderSizePixel = 0, ZIndex = 201,
+    }, overlay)
+    corner(barBg, 3)
+    local barFill = new("Frame", {
+        Size = UDim2.fromScale(0, 1), BackgroundColor3 = THEME.Accent, BorderSizePixel = 0, ZIndex = 202,
+    }, barBg)
+    corner(barFill, 3)
+
+    local steps = {"Carregando módulos...", "Preparando interface...", "Aplicando tema...", "Pronto!"}
+    for i, s in ipairs(steps) do
+        status.Text = s
+        tween(barFill, 0.25, {Size = UDim2.fromScale(i / #steps, 1)})
+        task.wait(0.28)
+    end
+
+    tween(overlay, 0.35, {BackgroundTransparency = 1})
+    tween(title, 0.35, {TextTransparency = 1})
+    tween(status, 0.35, {TextTransparency = 1})
+    tween(barBg, 0.35, {BackgroundTransparency = 1})
+    tween(barFill, 0.35, {BackgroundTransparency = 1})
+    task.wait(0.4)
+    overlay:Destroy()
+end
 
 ----------------------------------------------------------------
 -- Animação de abertura
