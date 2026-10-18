@@ -299,16 +299,45 @@ local function TextInput(scroll, placeholder)
     return box
 end
 
+-- Título de seção (para separar os grupos dentro de uma aba mesclada)
+local function Section(scroll, text)
+    return new("TextLabel", {
+        Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Text = "▸ " .. text,
+        TextColor3 = THEME.Accent, Font = Enum.Font.GothamBold, TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, scroll)
+end
+
 ----------------------------------------------------------------
 -- Abas (todas com a marca d'água)
 ----------------------------------------------------------------
 local pages, tabButtons = {}, {}
 local currentTab
 
+-- Abas mescladas: o nome antigo aponta para a aba que o recebe
+local TAB_ALIAS = {
+    ["Movimento"]  = "Jogador",
+    ["Personagem"] = "Jogador",
+    ["Câmera"]     = "Mundo",
+    ["Jogadores"]  = "Visual",
+    ["Utilidades"] = "Misc",
+    ["Efeitos"]    = "Aparência",
+}
+-- Ordem das abas na barra lateral
+local TAB_ORDER = {
+    ["Jogador"] = 1, ["Teleporte"] = 2, ["Visual"] = 3, ["Mundo"] = 4,
+    ["Aparência"] = 5, ["Música"] = 6, ["Misc"] = 7,
+}
+
 local function createTab(name)
+    name = TAB_ALIAS[name] or name
+    if pages[name] then
+        return pages[name]:FindFirstChildOfClass("ScrollingFrame")
+    end
     -- botão da sidebar
     local btn = new("TextButton", {
         Size = UDim2.new(1, 0, 0, 32), BackgroundColor3 = THEME.Panel2, BackgroundTransparency = 1,
+        LayoutOrder = TAB_ORDER[name] or 99,
         Text = name, TextColor3 = THEME.Sub, Font = Enum.Font.GothamMedium, TextSize = 13, AutoButtonColor = false,
     }, sidebar)
     corner(btn, 8)
@@ -484,6 +513,7 @@ end)
 ----------------------------------------------------------------
 -- Jogador
 local tPlayer = createTab("Jogador")
+Section(tPlayer, "Jogador")
 local setSpeed = Toggle(tPlayer, "Speed", function(v) S.speedOn = v
     if not v then local h = getHum() if h then h.WalkSpeed = 16 end end
 end)
@@ -497,6 +527,7 @@ Slider(tPlayer, "Gravidade", 0, 300, math.floor(workspace.Gravity), function(v) 
 
 -- Movimento
 local tMove = createTab("Movimento")
+Section(tMove, "Movimento")
 local setFly = Toggle(tMove, "Fly", function(v)
     S.fly = v
     if v then startFly() else stopFly() end
@@ -506,6 +537,7 @@ local setNoclip = Toggle(tMove, "Noclip", function(v) S.noclip = v end)
 
 -- Visual
 local tVisual = createTab("Visual")
+Section(tVisual, "Visual")
 local viewBox = TextInput(tVisual, "Nome do jogador (parcial)")
 Toggle(tVisual, "View (espectar)", function(v)
     if v then
@@ -542,6 +574,7 @@ end)
 
 -- Misc
 local tMisc = createTab("Misc")
+Section(tMisc, "Misc")
 Toggle(tMisc, "Anti-AFK", function(v) S.antiAfk = v end)
 Button(tMisc, "Resetar personagem", function()
     local h = getHum()
@@ -580,6 +613,7 @@ end
 ----------------------------------------------------------------
 do
     local t = createTab("Personagem")
+    Section(t, "Personagem")
 
     -- 1. Vida infinita (client)
     Toggle(t, "Vida infinita (client)", function(v)
@@ -744,6 +778,7 @@ end
 ----------------------------------------------------------------
 do
     local t = createTab("Mundo")
+    Section(t, "Mundo")
 
     -- 19. Hora do dia
     Slider(t, "Hora do dia", 0, 24, math.floor(Lighting.ClockTime), function(v) Lighting.ClockTime = v end)
@@ -874,6 +909,7 @@ end
 ----------------------------------------------------------------
 do
     local t = createTab("Câmera")
+    Section(t, "Câmera")
 
     -- 29. Zoom máximo
     Slider(t, "Zoom máximo", 20, 2000, math.clamp(math.floor(LP.CameraMaxZoomDistance), 20, 2000), function(v)
@@ -940,6 +976,7 @@ end
 ----------------------------------------------------------------
 do
     local t = createTab("Jogadores")
+    Section(t, "Jogadores")
 
     -- 35. Nametags com distância
     local tagFolder = new("Folder", {Name = "Tags"}, gui)
@@ -1037,6 +1074,7 @@ end
 ----------------------------------------------------------------
 do
     local t = createTab("Utilidades")
+    Section(t, "Utilidades")
 
     -- 41/42. Executor de scripts
     local box = TextInput(t, "Cole seu script Lua aqui")
@@ -1152,6 +1190,7 @@ end
 -- estiver recebendo a réplica.
 ----------------------------------------------------------------
 do
+  local __ok, __err = pcall(function()
     local t = createTab("Música")
     local SoundService = game:GetService("SoundService")
 
@@ -1206,61 +1245,11 @@ do
     end)
 
     onCleanup(function() sound:Destroy() end)
-end
-
-----------------------------------------------------------------
--- NOVO - ABA: Aparência (copiar a skin de qualquer jogador)
--- Obs.: a skin só aparece para todos se o jogo aceitar a mudança
--- feita pelo cliente; caso contrário só você vê.
-----------------------------------------------------------------
-do
-    local t = createTab("Aparência")
-
-    local nickBox = TextInput(t, "Nick do jogador (qualquer conta)")
-    local keepId = nil
-
-    local function getUserId(name)
-        name = name:gsub("%s", "")
-        if name == "" then return nil end
-        local ok, id = pcall(function() return Players:GetUserIdFromNameAsync(name) end)
-        if ok and id then return id end
-        local p = findPlayer(name)
-        return p and p.UserId or nil
-    end
-
-    local function applySkin(userId)
-        local hum = getHum()
-        if not hum then return false end
-        local ok, desc = pcall(function() return Players:GetHumanoidDescriptionFromUserId(userId) end)
-        if not ok or not desc then return false end
-        return pcall(function() hum:ApplyDescription(desc) end)
-    end
-
-    Button(t, "Copiar skin do nick", function()
-        local id = getUserId(nickBox.Text)
-        if not id then return notify("Jogador não encontrado") end
-        notify("Aplicando skin...")
-        if applySkin(id) then
-            keepId = id
-            notify("Skin aplicada!")
-        else
-            notify("Falha ao aplicar a skin")
-        end
-    end)
-
-    Button(t, "Voltar à minha skin", function()
-        keepId = nil
-        if applySkin(LP.UserId) then notify("Skin original restaurada") else notify("Falha ao restaurar") end
-    end)
-
-    Toggle(t, "Manter skin ao renascer", function(v) S.keepSkin = v end)
-    connect(LP.CharacterAdded, function(c)
-        if S.keepSkin and keepId then
-            c:WaitForChild("Humanoid", 10)
-            task.wait(0.8)
-            applySkin(keepId)
-        end
-    end)
+  end)
+  if not __ok then
+    warn("[Okkotsu Hub] erro na aba Música: " .. tostring(__err))
+    notify("Erro na aba Música (F9)")
+  end
 end
 
 ----------------------------------------------------------------
@@ -1269,7 +1258,9 @@ end
 -- só os veem se o jogo replicar a mudança feita pelo cliente.
 ----------------------------------------------------------------
 do
+  local __ok, __err = pcall(function()
     local t = createTab("Efeitos")
+    Section(t, "Efeitos e invisível")
     local active = {}
 
     local function detach(tag)
@@ -1396,6 +1387,11 @@ do
         applyInvis(false)
         for tag in pairs(active) do detach(tag) end
     end)
+  end)
+  if not __ok then
+    warn("[Okkotsu Hub] erro na aba Efeitos: " .. tostring(__err))
+    notify("Erro na aba Efeitos (F9)")
+  end
 end
 
 ----------------------------------------------------------------
