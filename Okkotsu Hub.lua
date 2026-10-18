@@ -79,8 +79,16 @@ local gui = new("ScreenGui", {
 -- NOVO: Sistema de key (bloqueia todo o resto do script até validar)
 ----------------------------------------------------------------
 do
+    -- Jogadores com privilégio: entram sem key e sem prazo.
+    -- Coloque o UserId (número da conta), um por linha, no formato:  [123456789] = true,
+    local PRIVILEGED = {
+        -- [4427424158] = true,
+    }
+
     local VALID_KEY  = "GLOBAL_866328948"
     local EXPIRES_AT = 1792906284 -- 25/10/2026 02:31:24 (Brasília) = exatamente 1 semana depois
+
+    if not PRIVILEGED[LP.UserId] then -- quem tem privilégio pula toda a tela de key
 
     local function nowTime()
         local ok, t = pcall(function() return workspace:GetServerTimeNow() end)
@@ -182,6 +190,8 @@ do
     tween(keyFrame, 0.25, {Size = UDim2.fromOffset(0, 0)}, Enum.EasingStyle.Back, Enum.EasingDirection.In)
     task.wait(0.3)
     keyFrame:Destroy()
+
+    end -- fim da checagem de privilégio
 end
 
 ----------------------------------------------------------------
