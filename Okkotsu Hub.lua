@@ -17,6 +17,12 @@ local VirtualUser      = game:GetService("VirtualUser")
 local HUB_NAME = "Okkotsu Hub (Universal Version)"
 local LP       = Players.LocalPlayer
 
+-- Jogadores com privilégio (VIP): entram sem key e sem prazo e recebem a Tag azul.
+-- Coloque o UserId (número da conta), um por linha, no formato:  [123456789] = true,
+local PRIVILEGED = {
+    -- [SEU_USERID_AQUI] = true,
+}
+
 local THEME = {
     Bg      = Color3.fromRGB(12, 12, 18),
     Panel   = Color3.fromRGB(22, 22, 32),
@@ -41,9 +47,179 @@ local function connect(signal, fn)
     return c
 end
 
+----------------------------------------------------------------
+-- Tradução PT <-> EN
+-- Os textos do script são escritos em português. Todo texto que existir
+-- no dicionário abaixo é traduzido automaticamente (e re-traduzido ao
+-- trocar o idioma, sem precisar recarregar o hub).
+----------------------------------------------------------------
+local DICT = {
+    -- key
+    ["Universal Version  •  Verificação de key"] = "Universal Version  •  Key verification",
+    ["Digite sua key para continuar"] = "Enter your key to continue",
+    ["🔑  Cole sua key aqui"] = "🔑  Paste your key here",
+    ["Validar"] = "Validate",
+    ["Cancelar"] = "Cancel",
+    ["💬  Pegar a key no Discord (copiar link)"] = "💬  Get the key on Discord (copy link)",
+    ["Link copiado! A key está no chat do Discord"] = "Link copied! The key is in the Discord chat",
+    ["Esta key expirou."] = "This key has expired.",
+    ["Key válida!"] = "Valid key!",
+    ["Key inválida"] = "Invalid key",
+    -- janela / abas
+    ["Universal Version  •  RightCtrl minimiza"] = "Universal Version  •  RightCtrl minimizes",
+    ["Buscar"] = "Search", ["Jogador"] = "Player", ["Teleporte"] = "Teleport", ["Mundo"] = "World",
+    ["Aparência"] = "Appearance", ["Música"] = "Music",
+    -- seções
+    ["Movimento"] = "Movement", ["Personagem"] = "Character", ["Câmera"] = "Camera", ["Jogadores"] = "Players",
+    ["Utilidades"] = "Utilities", ["Efeitos e invisível"] = "Effects and invisibility",
+    ["ESP avançado (ligue o ESP acima)"] = "Advanced ESP (turn on ESP above)",
+    ["Lista de jogadores (toque para selecionar)"] = "Player list (tap to select)",
+    ["Servidor do Discord"] = "Discord server", ["Buscar função"] = "Search function",
+    ["Tag — jogadores VIP ficam azuis"] = "Tag — VIP players turn blue",
+    -- jogador
+    ["Velocidade"] = "Walk speed", ["Super Pulo"] = "Super Jump", ["Força do pulo"] = "Jump power",
+    ["Pulo infinito"] = "Infinite jump", ["Gravidade"] = "Gravity",
+    ["Velocidade do Fly"] = "Fly speed",
+    ["Vida infinita (client)"] = "Infinite health (client)", ["Auto-curar"] = "Auto-heal", ["Auto-pular"] = "Auto-jump",
+    ["Girar personagem"] = "Spin character", ["Velocidade do giro"] = "Spin speed",
+    ["Congelar personagem"] = "Freeze character", ["Sprint (segurar Shift)"] = "Sprint (hold Shift)",
+    ["Dash (impulso para frente)"] = "Dash (forward boost)", ["Sentar"] = "Sit", ["Remover animações"] = "Remove animations",
+    -- visual
+    ["Nome do jogador (parcial)"] = "Player name (partial)", ["View (espectar)"] = "View (spectate)",
+    ["ESP (destacar jogadores)"] = "ESP (highlight players)", ["Campo de visão (FOV)"] = "Field of view (FOV)",
+    -- teleporte
+    ["Click TP (Ctrl + clique)"] = "Click TP (Ctrl + click)", ["Teleportar até o jogador"] = "Teleport to player",
+    ["TP para jogador aleatório"] = "TP to random player", ["Salvar posição"] = "Save position",
+    ["Voltar à posição salva"] = "Return to saved position", ["Ir ao spawn"] = "Go to spawn",
+    ["Subir 50 studs"] = "Go up 50 studs", ["Coordenadas: x, y, z"] = "Coordinates: x, y, z",
+    ["Teleportar para coordenadas"] = "Teleport to coordinates",
+    -- mundo
+    ["Hora do dia"] = "Time of day", ["Ciclo dia/noite"] = "Day/night cycle", ["Brilho"] = "Brightness",
+    ["Sem neblina"] = "No fog", ["Sem sombras"] = "No shadows", ["Remover pós-processamento"] = "Remove post-processing",
+    ["X-Ray (paredes transparentes)"] = "X-Ray (transparent walls)", ["Gráficos baixos"] = "Low graphics",
+    ["Gravidade da Lua"] = "Moon gravity", ["Gravidade normal"] = "Normal gravity",
+    -- câmera
+    ["Zoom máximo"] = "Max zoom", ["Primeira pessoa forçada"] = "Forced first person",
+    ["Câmera atravessa paredes"] = "Camera through walls", ["Barras cinematográficas"] = "Cinematic bars",
+    ["Zoom (segurar Z)"] = "Zoom (hold Z)", ["Resetar câmera"] = "Reset camera",
+    -- jogadores
+    ["Nametags com distância"] = "Nametags with distance", ["Ocultar nomes dos outros"] = "Hide names of others",
+    ["Info do servidor"] = "Server info", ["Copiar JobId"] = "Copy JobId",
+    ["Contador FPS / Ping"] = "FPS / Ping counter", ["Esconder UI do Roblox"] = "Hide Roblox UI",
+    -- misc / utilidades
+    ["Resetar personagem"] = "Reset character", ["Rejoin (reentrar no servidor)"] = "Rejoin (re-enter server)",
+    ["Cole seu script Lua aqui"] = "Paste your Lua script here", ["Executar script"] = "Run script",
+    ["Limpar caixa de script"] = "Clear script box", ["Auto-clicker (ferramenta)"] = "Auto-clicker (tool)",
+    ["Silenciar sons do jogo"] = "Mute game sounds", ["Copiar PlaceId"] = "Copy PlaceId",
+    ["Copiar posição atual"] = "Copy current position", ["Escala do hub"] = "Hub scale",
+    ["Atalhos (F = Fly, N = Noclip)"] = "Hotkeys (F = Fly, N = Noclip)", ["Restaurar padrões"] = "Restore defaults",
+    -- música
+    ["ID da música (somente números)"] = "Music ID (numbers only)", ["Tocar música"] = "Play music",
+    ["Pausar / Continuar"] = "Pause / Resume", ["Parar música"] = "Stop music", ["Velocidade (%)"] = "Speed (%)",
+    ["Repetir (loop)"] = "Repeat (loop)", ["Tocar para todos (no personagem)"] = "Play for everyone (on character)",
+    -- efeitos
+    ["Fogo Azul"] = "Blue Fire", ["Fogo Roxo"] = "Purple Fire", ["Fogo Amarelo"] = "Yellow Fire",
+    ["Fogo Arco-íris"] = "Rainbow Fire", ["Brilho dourado"] = "Golden glow", ["Faíscas roxas"] = "Purple sparks",
+    ["Fumaça"] = "Smoke", ["Aura neon"] = "Neon aura", ["Modo invisível"] = "Invisible mode",
+    -- esp
+    ["ESP: mostrar nome"] = "ESP: show name", ["ESP: mostrar vida"] = "ESP: show health",
+    ["ESP: mostrar distância"] = "ESP: show distance", ["ESP: cor por time"] = "ESP: team color",
+    ["ESP: distância máxima"] = "ESP: max distance",
+    -- lista de jogadores
+    ["Selecionado: ninguém"] = "Selected: nobody", ["Selecionado: "] = "Selected: ",
+    ["Teleportar até o selecionado"] = "Teleport to selected", ["Espectar o selecionado"] = "Spectate selected",
+    ["Parar de espectar"] = "Stop spectating", ["Copiar nick do selecionado"] = "Copy selected nick",
+    -- discord / busca
+    ["Copiar link do Discord"] = "Copy Discord link", ["Entre na nossa comunidade:"] = "Join our community:",
+    ["🔍  Digite o nome da função..."] = "🔍  Type the function name...", ["Nada encontrado"] = "Nothing found",
+    -- fechar
+    ["Fechar o script?"] = "Close the script?",
+    ["Todas as funções serão desativadas e o hub será removido."] = "All features will be disabled and the hub will be removed.",
+    ["Não"] = "No", ["Sim, fechar"] = "Yes, close",
+    -- loading
+    ["Carregando..."] = "Loading...", ["Carregando módulos..."] = "Loading modules...",
+    ["Preparando interface..."] = "Preparing interface...", ["Aplicando tema..."] = "Applying theme...",
+    ["Pronto!"] = "Done!",
+    -- avisos (toasts)
+    ["Jogador não encontrado"] = "Player not found", ["Vendo: "] = "Viewing: ",
+    ["Nenhum jogador disponível"] = "No players available", ["Posição salva"] = "Position saved",
+    ["Nenhuma posição salva"] = "No saved position", ["Spawn não encontrado"] = "Spawn not found",
+    ["Formato: x, y, z"] = "Format: x, y, z", ["Gráficos reduzidos"] = "Graphics reduced",
+    ["Área de transferência indisponível"] = "Clipboard unavailable", [" copiado"] = " copied",
+    ["Texto"] = "Text", ["Posição"] = "Position", ["Link do Discord"] = "Discord link",
+    ["loadstring indisponível aqui"] = "loadstring unavailable here", ["Caixa vazia"] = "Box is empty",
+    ["Erro de sintaxe (veja o console)"] = "Syntax error (check the console)",
+    ["Script executado"] = "Script executed", ["Erro ao executar"] = "Error while running",
+    ["Procurando servidor..."] = "Searching for a server...", ["Falha ao buscar servidores"] = "Failed to fetch servers",
+    ["Nenhum servidor disponível"] = "No server available", ["Valores restaurados"] = "Values restored",
+    ["ID inválido"] = "Invalid ID", ["Tocando ID "] = "Playing ID ", ["Música parada"] = "Music stopped",
+    ["Invisível ativado"] = "Invisible enabled", ["Invisível desativado"] = "Invisible disabled",
+    ["Selecione um jogador na lista"] = "Select a player from the list",
+    ["Jogador sem personagem"] = "Player has no character",
+    [" jogadores no servidor"] = " players in the server", [" carregado"] = " loaded",
+}
+local PREFIXES = {"Vendo: ", "Tocando ID ", "Selecionado: "}
+local SUFFIXES = {" copiado", " jogadores no servidor", " carregado"}
+
+local function trEn(s)
+    local d = DICT[s]
+    if d then return d end
+    if s:sub(1, 4) == "▸ " then return "▸ " .. trEn(s:sub(5)) end
+    for _, p in ipairs(PREFIXES) do
+        if #s > #p and s:sub(1, #p) == p then return DICT[p] .. s:sub(#p + 1) end
+    end
+    for _, x in ipairs(SUFFIXES) do
+        if #s > #x and s:sub(-#x) == x then return trEn(s:sub(1, #s - #x)) .. DICT[x] end
+    end
+    return s
+end
+
+local lang = "pt"
+do
+    local saved
+    pcall(function()
+        if isfile and isfile("OkkotsuHub_lang.txt") then saved = readfile("OkkotsuHub_lang.txt") end
+    end)
+    if saved == "en" or saved == "pt" then
+        lang = saved
+    else
+        pcall(function()
+            if not tostring(LP.LocaleId):lower():find("^pt") then lang = "en" end
+        end)
+    end
+end
+
+local function T(s)
+    if lang == "en" then return trEn(s) end
+    return s
+end
+
+local I18N = setmetatable({}, {__mode = "k"}) -- [instância] = {Text = "original pt", ...}
+local langHooks = {}                          -- funções extras chamadas ao trocar o idioma
+local function setLang(l)
+    lang = l
+    for o, props in pairs(I18N) do
+        for prop, pt in pairs(props) do
+            pcall(function() o[prop] = T(pt) end)
+        end
+    end
+    for _, h in ipairs(langHooks) do pcall(h) end
+    pcall(function() if writefile then writefile("OkkotsuHub_lang.txt", l) end end)
+end
+
 local function new(class, props, parent)
     local o = Instance.new(class)
     for k, v in pairs(props or {}) do o[k] = v end
+    if props then
+        for _, prop in ipairs({"Text", "PlaceholderText"}) do
+            local v = props[prop]
+            if type(v) == "string" and v ~= "" and trEn(v) ~= v then
+                I18N[o] = I18N[o] or {}
+                I18N[o][prop] = v
+                if lang == "en" then o[prop] = trEn(v) end
+            end
+        end
+    end
     if parent then o.Parent = parent end
     return o
 end
@@ -127,12 +303,6 @@ end
 -- Sistema de key (bloqueia o resto do script até validar)
 ----------------------------------------------------------------
 do
-    -- Jogadores com privilégio: entram sem key e sem prazo.
-    -- Coloque o UserId (número da conta), um por linha, no formato:  [123456789] = true,
-    local PRIVILEGED = {
-         [4427424158] = true,
-    }
-
     local VALID_KEY  = "GLOBAL_866328948"
     local EXPIRES_AT = 1792906284 -- 25/10/2026 02:31:24 (Brasília) = exatamente 1 semana depois
 
@@ -161,6 +331,17 @@ do
 
     local banner = new("Frame", {Size = UDim2.new(1, 0, 0, 84), BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.8, BorderSizePixel = 0}, card)
     gradient(banner, THEME.Accent, THEME.Accent2, 25)
+    local langBtn = new("TextButton", {
+        AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 12), Size = UDim2.fromOffset(58, 22),
+        BackgroundColor3 = THEME.Panel2, Text = "🌐 " .. lang:upper(), TextColor3 = THEME.Text,
+        Font = Enum.Font.GothamBold, TextSize = 11, AutoButtonColor = false,
+    }, card)
+    corner(langBtn, 8)
+    hover(langBtn, THEME.Panel2, THEME.Panel3)
+    langBtn.MouseButton1Click:Connect(function()
+        setLang(lang == "pt" and "en" or "pt")
+        langBtn.Text = "🌐 " .. lang:upper()
+    end)
     local logo = new("TextLabel", {
         Position = UDim2.fromOffset(20, 20), Size = UDim2.fromOffset(44, 44), BackgroundColor3 = Color3.new(1, 1, 1),
         Text = "◈", TextColor3 = Color3.new(1, 1, 1), Font = Enum.Font.GothamBold, TextSize = 26,
@@ -221,7 +402,7 @@ do
         local fn = setclipboard or toclipboard
         if fn then
             pcall(fn, "https://discord.gg/J9Z9N6qsEc")
-            info.Text = "Link copiado! A key está no chat do Discord"
+            info.Text = T("Link copiado! A key está no chat do Discord")
             info.TextColor3 = THEME.Sub
         else
             info.Text = "https://discord.gg/J9Z9N6qsEc"
@@ -241,7 +422,7 @@ do
     local result = nil -- true = liberado | false = cancelado/expirado
     local function submit()
         if nowTime() >= EXPIRES_AT then
-            info.Text = "Esta key expirou."
+            info.Text = T("Esta key expirou.")
             info.TextColor3 = THEME.Bad
             shake()
             task.wait(1.2)
@@ -249,12 +430,12 @@ do
             return
         end
         if input.Text:gsub("^%s+", ""):gsub("%s+$", "") == VALID_KEY then
-            info.Text = "Key válida!"
+            info.Text = T("Key válida!")
             info.TextColor3 = THEME.Good
             task.wait(0.6)
             result = true
         else
-            info.Text = "Key inválida"
+            info.Text = T("Key inválida")
             info.TextColor3 = THEME.Bad
             shake()
         end
@@ -264,7 +445,7 @@ do
     cancel.MouseButton1Click:Connect(function() result = false end)
 
     if nowTime() >= EXPIRES_AT then
-        info.Text = "Esta key expirou."
+        info.Text = T("Esta key expirou.")
         info.TextColor3 = THEME.Bad
     end
 
@@ -312,6 +493,7 @@ new("UIListLayout", {
 local toastN = 0
 
 local function notify(text)
+    text = T(text)
     toastN += 1
     local wrap = new("Frame", {Size = UDim2.fromOffset(260, 44), BackgroundTransparency = 1, LayoutOrder = toastN}, toastHolder)
     local card = new("Frame", {
@@ -1364,6 +1546,16 @@ Button(tMisc, "Rejoin (reentrar no servidor)", function()
     TeleportService:Teleport(game.PlaceId, LP)
 end)
 
+Section(tMisc, "Idioma / Language")
+Button(tMisc, "Português (PT-BR)", function()
+    setLang("pt")
+    notify("Idioma: Português")
+end)
+Button(tMisc, "English (EN)", function()
+    setLang("en")
+    notify("Language: English")
+end)
+
 do
     local t = createTab("Utilidades")
     Section(t, "Utilidades")
@@ -1669,6 +1861,84 @@ do
 end
 
 ----------------------------------------------------------------
+-- NOVO - Tag: jogadores com privilégio (PRIVILEGED) ficam azuis.
+-- Quem estiver usando o hub vê os jogadores VIP com o efeito azul
+-- (o efeito é local: roda no cliente de cada pessoa que tem o hub).
+----------------------------------------------------------------
+do
+  local __ok, __err = pcall(function()
+    local t = createTab("Efeitos")
+    Section(t, "Tag — jogadores VIP ficam azuis")
+
+    local TAG_BLUE  = Color3.fromRGB(40, 130, 255)
+    local TAG_LIGHT = Color3.fromRGB(150, 210, 255)
+    local tagFolder = new("Folder", {Name = "VIPTags"}, gui)
+    local tagOn = true
+    local applied = {}
+
+    local function clearTag(p)
+        local o = applied[p]
+        if o then
+            for _, inst in ipairs(o) do inst:Destroy() end
+            applied[p] = nil
+        end
+    end
+
+    local function applyTag(p)
+        clearTag(p)
+        if not tagOn or not PRIVILEGED[p.UserId] then return end
+        local char = p.Character
+        if not char then return end
+        local made = {}
+        made[#made + 1] = new("Highlight", {
+            Name = "OKK_VIP", Adornee = char, FillColor = TAG_BLUE, OutlineColor = TAG_LIGHT,
+            FillTransparency = 0.3, OutlineTransparency = 0, DepthMode = Enum.HighlightDepthMode.Occluded,
+        }, tagFolder)
+        local head = char:FindFirstChild("Head")
+        if head then
+            local bb = new("BillboardGui", {
+                Name = "OKK_VIPTag", Adornee = head, Size = UDim2.fromOffset(120, 22),
+                StudsOffset = Vector3.new(0, 4.4, 0), AlwaysOnTop = true,
+            }, tagFolder)
+            new("TextLabel", {
+                Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "◈ VIP",
+                TextColor3 = TAG_LIGHT, TextStrokeColor3 = TAG_BLUE, TextStrokeTransparency = 0.2,
+                Font = Enum.Font.GothamBold, TextSize = 14,
+            }, bb)
+            made[#made + 1] = bb
+        end
+        applied[p] = made
+    end
+
+    local function watch(p)
+        connect(p.CharacterAdded, function()
+            task.wait(0.6)
+            applyTag(p)
+        end)
+        task.defer(applyTag, p)
+    end
+    for _, p in ipairs(Players:GetPlayers()) do watch(p) end
+    connect(Players.PlayerAdded, watch)
+    connect(Players.PlayerRemoving, clearTag)
+
+    local setTag = Toggle(t, "Tag", function(v)
+        tagOn = v
+        for _, p in ipairs(Players:GetPlayers()) do applyTag(p) end
+    end)
+    setTag(true)
+
+    onCleanup(function()
+        tagOn = false
+        for p in pairs(applied) do clearTag(p) end
+    end)
+  end)
+  if not __ok then
+    warn("[Okkotsu Hub] erro na Tag: " .. tostring(__err))
+    notify("Erro na Tag (F9)")
+  end
+end
+
+----------------------------------------------------------------
 -- ESP avançado (aba Visual)
 ----------------------------------------------------------------
 do
@@ -1793,10 +2063,12 @@ do
         for p, b in pairs(rows) do
             tween(b, 0.15, {BackgroundColor3 = (p == selected) and THEME.Accent or THEME.Panel2})
         end
-        status.Text = selected
+        status.Text = T(selected
             and ("Selecionado: " .. selected.DisplayName .. " (@" .. selected.Name .. ")")
-            or "Selecionado: ninguém"
+            or "Selecionado: ninguém")
     end
+
+    table.insert(langHooks, paint)
 
     local function addRow(p)
         if p == LP or rows[p] then return end
@@ -1878,12 +2150,16 @@ do
     local row = new("Frame", {Size = UDim2.new(1, 0, 0, 70), BackgroundColor3 = THEME.Panel, BorderSizePixel = 0}, t)
     corner(row, 10)
     gradient(stroke(row, Color3.new(1, 1, 1), 1, 0.5), THEME.Accent, THEME.Accent2, 45)
-    new("TextLabel", {
+    local discordLbl = new("TextLabel", {
         Position = UDim2.fromOffset(16, 0), Size = UDim2.new(1, -32, 1, 0), BackgroundTransparency = 1,
-        Text = "Entre na nossa comunidade:\n" .. DISCORD_LINK, TextColor3 = THEME.Text,
+        Text = T("Entre na nossa comunidade:") .. "\n" .. DISCORD_LINK, TextColor3 = THEME.Text,
         Font = Enum.Font.GothamMedium, TextSize = 13, TextWrapped = true,
         TextXAlignment = Enum.TextXAlignment.Left,
     }, row)
+
+    table.insert(langHooks, function()
+        discordLbl.Text = T("Entre na nossa comunidade:") .. "\n" .. DISCORD_LINK
+    end)
 
     Button(t, "Copiar link do Discord", function() copy(DISCORD_LINK, "Link do Discord") end)
   end)
@@ -1976,7 +2252,7 @@ do
             if item.key:find(q, 1, true) then
                 shown += 1
                 if shown > 15 then break end
-                results[#results + 1] = Button(t, item.text .. "   ›  " .. item.tab, function() goTo(item) end)
+                results[#results + 1] = Button(t, item.text .. "   ›  " .. T(item.tab), function() goTo(item) end)
             end
         end
         if shown == 0 then
@@ -1987,6 +2263,7 @@ do
         end
     end
     box:GetPropertyChangedSignal("Text"):Connect(refresh)
+    table.insert(langHooks, refresh)
   end)
   if not __ok then
     warn("[Okkotsu Hub] erro na busca: " .. tostring(__err))
@@ -2158,7 +2435,7 @@ do
 
     local steps = {"Carregando módulos...", "Preparando interface...", "Aplicando tema...", "Pronto!"}
     for i, s in ipairs(steps) do
-        status.Text = s
+        status.Text = T(s)
         tween(barFill, 0.25, {Size = UDim2.fromScale(i / #steps, 1)})
         task.wait(0.28)
     end
