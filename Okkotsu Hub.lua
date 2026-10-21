@@ -1,7 +1,8 @@
 --[[
-    Okkotsu Hub (Universal Version)
-    GUI minimalista com animações, abas e botão de minimizar.
-    Abas: Jogador | Movimento | Visual | Misc
+    Okkotsu Hub (Universal Version) — UI v2
+    Interface refeita: janela com sombra, gradientes, sidebar com ícones,
+    cartão do jogador, toasts empilhados, sliders com knob, toggles animados,
+    tela de key / loading / confirmação redesenhadas.
     Atalho: RightControl = minimizar / restaurar
 ]]
 
@@ -17,13 +18,17 @@ local HUB_NAME = "Okkotsu Hub (Universal Version)"
 local LP       = Players.LocalPlayer
 
 local THEME = {
-    Bg     = Color3.fromRGB(16, 16, 22),
-    Panel  = Color3.fromRGB(26, 26, 36),
-    Panel2 = Color3.fromRGB(34, 34, 48),
-    Accent = Color3.fromRGB(150, 100, 255),
-    Text   = Color3.fromRGB(235, 235, 245),
-    Sub    = Color3.fromRGB(140, 140, 160),
-    Off    = Color3.fromRGB(60, 60, 78),
+    Bg      = Color3.fromRGB(12, 12, 18),
+    Panel   = Color3.fromRGB(22, 22, 32),
+    Panel2  = Color3.fromRGB(32, 32, 46),
+    Panel3  = Color3.fromRGB(42, 42, 60),
+    Accent  = Color3.fromRGB(150, 100, 255),
+    Accent2 = Color3.fromRGB(232, 108, 200),
+    Text    = Color3.fromRGB(238, 238, 248),
+    Sub     = Color3.fromRGB(135, 135, 158),
+    Off     = Color3.fromRGB(52, 52, 72),
+    Good    = Color3.fromRGB(90, 220, 130),
+    Bad     = Color3.fromRGB(235, 75, 90),
 }
 
 ----------------------------------------------------------------
@@ -45,10 +50,36 @@ end
 
 local function corner(o, r) return new("UICorner", {CornerRadius = UDim.new(0, r)}, o) end
 
+local function stroke(o, color, thick, trans)
+    return new("UIStroke", {
+        Color = color or THEME.Accent, Thickness = thick or 1, Transparency = trans or 0.5,
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+    }, o)
+end
+
+local function gradient(o, c1, c2, rot)
+    return new("UIGradient", {Color = ColorSequence.new(c1, c2), Rotation = rot or 0}, o)
+end
+
 local function tween(o, t, props, style, dir)
     local tw = TweenService:Create(o, TweenInfo.new(t, style or Enum.EasingStyle.Quint, dir or Enum.EasingDirection.Out), props)
     tw:Play()
     return tw
+end
+
+local function shadow(parent, z)
+    return new("ImageLabel", {
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.new(1, 56, 1, 56), BackgroundTransparency = 1,
+        Image = "rbxassetid://6014261993", ImageColor3 = Color3.new(0, 0, 0), ImageTransparency = 0.3,
+        ScaleType = Enum.ScaleType.Slice, SliceCenter = Rect.new(49, 49, 450, 450), ZIndex = z or 1,
+    }, parent)
+end
+
+local function hover(b, base, over, target)
+    target = target or b
+    b.MouseEnter:Connect(function() tween(target, 0.15, {BackgroundColor3 = over}) end)
+    b.MouseLeave:Connect(function() tween(target, 0.15, {BackgroundColor3 = base}) end)
 end
 
 local function getHum() local c = LP.Character return c and c:FindFirstChildOfClass("Humanoid") end
@@ -67,6 +98,8 @@ end
 local parent = getGuiParent()
 local old = parent:FindFirstChild("OkkotsuHub")
 if old then old:Destroy() end
+local oldBlur = Lighting:FindFirstChild("OkkBlur")
+if oldBlur then oldBlur:Destroy() end
 
 local gui = new("ScreenGui", {
     Name = "OkkotsuHub",
@@ -75,20 +108,35 @@ local gui = new("ScreenGui", {
     IgnoreGuiInset = true,
 }, parent)
 
+-- Blur de fundo (usado na tela de key)
+local blur
+local function setBlur(size)
+    if not blur then blur = new("BlurEffect", {Name = "OkkBlur", Size = 0}, Lighting) end
+    tween(blur, 0.5, {Size = size})
+end
+local function clearBlur()
+    if blur then
+        local b = blur
+        blur = nil
+        tween(b, 0.4, {Size = 0})
+        task.delay(0.45, function() b:Destroy() end)
+    end
+end
+
 ----------------------------------------------------------------
--- NOVO: Sistema de key (bloqueia todo o resto do script até validar)
+-- Sistema de key (bloqueia o resto do script até validar)
 ----------------------------------------------------------------
 do
     -- Jogadores com privilégio: entram sem key e sem prazo.
     -- Coloque o UserId (número da conta), um por linha, no formato:  [123456789] = true,
     local PRIVILEGED = {
-         [4427424158] = true,
+        -- [4427424158] = true,
     }
 
     local VALID_KEY  = "GLOBAL_866328948"
     local EXPIRES_AT = 1792906284 -- 25/10/2026 02:31:24 (Brasília) = exatamente 1 semana depois
 
-    if not PRIVILEGED[LP.UserId] then -- quem tem privilégio pula toda a tela de key
+    if not PRIVILEGED[LP.UserId] then
 
     local function nowTime()
         local ok, t = pcall(function() return workspace:GetServerTimeNow() end)
@@ -96,47 +144,79 @@ do
         return os.time()
     end
 
-    local keyFrame = new("Frame", {
-        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
-        Size = UDim2.fromOffset(0, 0), BackgroundColor3 = THEME.Bg, BorderSizePixel = 0,
-        ClipsDescendants = true, ZIndex = 300,
-    }, gui)
-    corner(keyFrame, 12)
-    new("UIStroke", {Color = THEME.Accent, Thickness = 1, Transparency = 0.4}, keyFrame)
+    setBlur(18)
 
+    local kwrap = new("Frame", {
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1, ZIndex = 300,
+    }, gui)
+    shadow(kwrap, 300)
+    local card = new("Frame", {
+        Size = UDim2.fromScale(1, 1), BackgroundColor3 = THEME.Bg, BorderSizePixel = 0,
+        ClipsDescendants = true, ZIndex = 301,
+    }, kwrap)
+    corner(card, 16)
+    gradient(stroke(card, Color3.new(1, 1, 1), 1, 0.4), THEME.Accent, THEME.Accent2, 45)
+    gradient(card, Color3.fromRGB(20, 17, 32), Color3.fromRGB(11, 11, 17), 90)
+
+    local banner = new("Frame", {Size = UDim2.new(1, 0, 0, 84), BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.8, BorderSizePixel = 0}, card)
+    gradient(banner, THEME.Accent, THEME.Accent2, 25)
+    local logo = new("TextLabel", {
+        Position = UDim2.fromOffset(20, 20), Size = UDim2.fromOffset(44, 44), BackgroundColor3 = Color3.new(1, 1, 1),
+        Text = "◈", TextColor3 = Color3.new(1, 1, 1), Font = Enum.Font.GothamBold, TextSize = 26,
+    }, card)
+    corner(logo, 12)
+    gradient(logo, THEME.Accent, THEME.Accent2, 45)
     new("TextLabel", {
-        Position = UDim2.fromOffset(0, 14), Size = UDim2.new(1, 0, 0, 24), BackgroundTransparency = 1,
-        Text = HUB_NAME, TextColor3 = THEME.Text, Font = Enum.Font.GothamBold, TextSize = 15, ZIndex = 301,
-    }, keyFrame)
+        Position = UDim2.fromOffset(76, 20), Size = UDim2.new(1, -90, 0, 24), BackgroundTransparency = 1,
+        Text = "Okkotsu Hub", TextColor3 = THEME.Text, Font = Enum.Font.GothamBold, TextSize = 19,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, card)
+    new("TextLabel", {
+        Position = UDim2.fromOffset(76, 44), Size = UDim2.new(1, -90, 0, 18), BackgroundTransparency = 1,
+        Text = "Universal Version  •  Verificação de key", TextColor3 = THEME.Sub, Font = Enum.Font.GothamMedium,
+        TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left,
+    }, card)
+
     local info = new("TextLabel", {
-        Position = UDim2.fromOffset(10, 42), Size = UDim2.new(1, -20, 0, 20), BackgroundTransparency = 1,
+        Position = UDim2.fromOffset(20, 98), Size = UDim2.new(1, -40, 0, 18), BackgroundTransparency = 1,
         Text = "Digite sua key para continuar", TextColor3 = THEME.Sub,
-        Font = Enum.Font.GothamMedium, TextSize = 12, ZIndex = 301,
-    }, keyFrame)
+        Font = Enum.Font.GothamMedium, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left,
+    }, card)
     local input = new("TextBox", {
-        Position = UDim2.fromOffset(20, 72), Size = UDim2.new(1, -40, 0, 34), BackgroundColor3 = THEME.Panel,
-        Text = "", PlaceholderText = "Key", PlaceholderColor3 = THEME.Sub, TextColor3 = THEME.Text,
-        Font = Enum.Font.GothamMedium, TextSize = 13, ClearTextOnFocus = false, ZIndex = 301,
-    }, keyFrame)
-    corner(input, 8)
+        Position = UDim2.fromOffset(20, 122), Size = UDim2.new(1, -40, 0, 38), BackgroundColor3 = THEME.Panel,
+        Text = "", PlaceholderText = "🔑  Cole sua key aqui", PlaceholderColor3 = THEME.Sub, TextColor3 = THEME.Text,
+        Font = Enum.Font.GothamMedium, TextSize = 13, ClearTextOnFocus = false, TextXAlignment = Enum.TextXAlignment.Left,
+    }, card)
+    corner(input, 10)
+    new("UIPadding", {PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12)}, input)
+    local inStroke = stroke(input, THEME.Accent, 1, 1)
+    input.Focused:Connect(function() tween(inStroke, 0.2, {Transparency = 0.2}) end)
+    input.FocusLost:Connect(function() tween(inStroke, 0.2, {Transparency = 1}) end)
+
     local confirm = new("TextButton", {
-        Position = UDim2.fromOffset(20, 118), Size = UDim2.new(0.5, -26, 0, 32), BackgroundColor3 = THEME.Accent,
-        Text = "Validar", TextColor3 = THEME.Text, Font = Enum.Font.GothamBold, TextSize = 13,
-        AutoButtonColor = false, ZIndex = 301,
-    }, keyFrame)
-    corner(confirm, 8)
+        Position = UDim2.fromOffset(20, 172), Size = UDim2.new(0.5, -26, 0, 36), BackgroundColor3 = Color3.new(1, 1, 1),
+        Text = "Validar", TextColor3 = Color3.new(1, 1, 1), Font = Enum.Font.GothamBold, TextSize = 13, AutoButtonColor = false,
+    }, card)
+    corner(confirm, 10)
+    gradient(confirm, THEME.Accent, THEME.Accent2, 20)
+    confirm.MouseEnter:Connect(function() tween(confirm, 0.15, {BackgroundTransparency = 0.12}) end)
+    confirm.MouseLeave:Connect(function() tween(confirm, 0.15, {BackgroundTransparency = 0}) end)
     local cancel = new("TextButton", {
-        AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -20, 0, 118), Size = UDim2.new(0.5, -26, 0, 32),
+        AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -20, 0, 172), Size = UDim2.new(0.5, -26, 0, 36),
         BackgroundColor3 = THEME.Panel2, Text = "Cancelar", TextColor3 = THEME.Text,
-        Font = Enum.Font.GothamBold, TextSize = 13, AutoButtonColor = false, ZIndex = 301,
-    }, keyFrame)
-    corner(cancel, 8)
+        Font = Enum.Font.GothamBold, TextSize = 13, AutoButtonColor = false,
+    }, card)
+    corner(cancel, 10)
+    hover(cancel, THEME.Panel2, THEME.Panel3)
+
     local getKey = new("TextButton", {
-        Position = UDim2.fromOffset(20, 160), Size = UDim2.new(1, -40, 0, 28), BackgroundColor3 = THEME.Panel,
-        Text = "Pegar a key no Discord (copiar link)", TextColor3 = THEME.Accent,
-        Font = Enum.Font.GothamMedium, TextSize = 12, AutoButtonColor = false, ZIndex = 301,
-    }, keyFrame)
-    corner(getKey, 8)
+        Position = UDim2.fromOffset(20, 220), Size = UDim2.new(1, -40, 0, 32), BackgroundColor3 = THEME.Panel,
+        Text = "💬  Pegar a key no Discord (copiar link)", TextColor3 = THEME.Accent,
+        Font = Enum.Font.GothamMedium, TextSize = 12, AutoButtonColor = false,
+    }, card)
+    corner(getKey, 10)
+    hover(getKey, THEME.Panel, THEME.Panel2)
     getKey.MouseButton1Click:Connect(function()
         local fn = setclipboard or toclipboard
         if fn then
@@ -149,47 +229,56 @@ do
         end
     end)
 
-    tween(keyFrame, 0.35, {Size = UDim2.fromOffset(320, 204)}, Enum.EasingStyle.Back)
+    tween(kwrap, 0.45, {Size = UDim2.fromOffset(360, 272)}, Enum.EasingStyle.Back)
+
+    local function shake()
+        for _, dx in ipairs({9, -9, 6, -6, 0}) do
+            tween(kwrap, 0.05, {Position = UDim2.new(0.5, dx, 0.5, 0)})
+            task.wait(0.05)
+        end
+    end
 
     local result = nil -- true = liberado | false = cancelado/expirado
     local function submit()
         if nowTime() >= EXPIRES_AT then
             info.Text = "Esta key expirou."
-            info.TextColor3 = Color3.fromRGB(220, 70, 80)
-            task.wait(1.5)
+            info.TextColor3 = THEME.Bad
+            shake()
+            task.wait(1.2)
             result = false
             return
         end
         if input.Text:gsub("^%s+", ""):gsub("%s+$", "") == VALID_KEY then
             info.Text = "Key válida!"
-            info.TextColor3 = Color3.fromRGB(90, 220, 130)
+            info.TextColor3 = THEME.Good
             task.wait(0.6)
             result = true
         else
             info.Text = "Key inválida"
-            info.TextColor3 = Color3.fromRGB(220, 70, 80)
+            info.TextColor3 = THEME.Bad
+            shake()
         end
     end
     confirm.MouseButton1Click:Connect(submit)
     input.FocusLost:Connect(function(enter) if enter then submit() end end)
     cancel.MouseButton1Click:Connect(function() result = false end)
 
-    -- se a key já tiver expirado, avisa logo
     if nowTime() >= EXPIRES_AT then
         info.Text = "Esta key expirou."
-        info.TextColor3 = Color3.fromRGB(220, 70, 80)
+        info.TextColor3 = THEME.Bad
     end
 
     while result == nil and gui.Parent do task.wait(0.1) end
 
     if result ~= true then
+        clearBlur()
         gui:Destroy()
         return
     end
 
-    tween(keyFrame, 0.25, {Size = UDim2.fromOffset(0, 0)}, Enum.EasingStyle.Back, Enum.EasingDirection.In)
-    task.wait(0.3)
-    keyFrame:Destroy()
+    tween(kwrap, 0.3, {Size = UDim2.fromOffset(0, 0)}, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+    task.wait(0.35)
+    kwrap:Destroy()
 
     end -- fim da checagem de privilégio
 end
@@ -210,86 +299,159 @@ local S = {
 }
 
 ----------------------------------------------------------------
--- Notificação (toast)
+-- Notificações (toasts empilhados no canto superior direito)
 ----------------------------------------------------------------
+local toastHolder = new("Frame", {
+    Name = "Toasts", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, 16),
+    Size = UDim2.fromOffset(270, 420), BackgroundTransparency = 1, ZIndex = 100,
+}, gui)
+new("UIListLayout", {
+    Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder,
+    HorizontalAlignment = Enum.HorizontalAlignment.Right,
+}, toastHolder)
+local toastN = 0
+
 local function notify(text)
-    local t = new("TextLabel", {
-        AnchorPoint = Vector2.new(0.5, 1),
-        Position = UDim2.new(0.5, 0, 1, 40),
-        Size = UDim2.fromOffset(260, 32),
-        BackgroundColor3 = THEME.Panel,
-        Text = text, TextColor3 = THEME.Text,
-        Font = Enum.Font.GothamMedium, TextSize = 13,
-        ZIndex = 50,
-    }, gui)
-    corner(t, 8)
-    new("UIStroke", {Color = THEME.Accent, Thickness = 1, Transparency = 0.4}, t)
-    tween(t, 0.35, {Position = UDim2.new(0.5, 0, 1, -24)}, Enum.EasingStyle.Back)
-    task.delay(2, function()
-        tween(t, 0.3, {Position = UDim2.new(0.5, 0, 1, 40)})
+    toastN += 1
+    local wrap = new("Frame", {Size = UDim2.fromOffset(260, 44), BackgroundTransparency = 1, LayoutOrder = toastN}, toastHolder)
+    local card = new("Frame", {
+        Position = UDim2.fromOffset(290, 0), Size = UDim2.fromScale(1, 1), BackgroundColor3 = THEME.Panel,
+        BorderSizePixel = 0, ClipsDescendants = true,
+    }, wrap)
+    corner(card, 10)
+    stroke(card, THEME.Accent, 1, 0.6)
+    local bar = new("Frame", {Size = UDim2.new(0, 4, 1, 0), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0}, card)
+    gradient(bar, THEME.Accent, THEME.Accent2, 90)
+    new("TextLabel", {
+        Position = UDim2.fromOffset(16, 0), Size = UDim2.new(1, -24, 1, -3), BackgroundTransparency = 1,
+        Text = text, TextColor3 = THEME.Text, Font = Enum.Font.GothamMedium, TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
+    }, card)
+    local prog = new("Frame", {
+        AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1), Size = UDim2.new(1, 0, 0, 2),
+        BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0,
+    }, card)
+    gradient(prog, THEME.Accent, THEME.Accent2, 0)
+    tween(card, 0.4, {Position = UDim2.fromOffset(0, 0)}, Enum.EasingStyle.Back)
+    tween(prog, 2.4, {Size = UDim2.new(0, 0, 0, 2)}, Enum.EasingStyle.Linear)
+    task.delay(2.5, function()
+        tween(card, 0.3, {Position = UDim2.fromOffset(290, 0)})
         task.wait(0.35)
-        t:Destroy()
+        wrap:Destroy()
     end)
 end
 
 ----------------------------------------------------------------
 -- Janela principal
 ----------------------------------------------------------------
-local WIDTH, HEIGHT = 480, 310
+local WIDTH, HEIGHT = 620, 390
+local vp = workspace.CurrentCamera.ViewportSize
+
+local root = new("Frame", {
+    Name = "Root", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+    Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1,
+}, gui)
+local uiScale = new("UIScale", {
+    Scale = math.clamp(math.min(vp.X / (WIDTH + 30), vp.Y / (HEIGHT + 30)), 0.5, 1),
+}, root)
+shadow(root, 0)
 
 local main = new("Frame", {
-    Name = "Main",
-    AnchorPoint = Vector2.new(0.5, 0.5),
-    Position = UDim2.fromScale(0.5, 0.5),
-    Size = UDim2.fromOffset(0, 0),
-    BackgroundColor3 = THEME.Bg,
-    BorderSizePixel = 0,
-    ClipsDescendants = true,
-}, gui)
-corner(main, 12)
-new("UIStroke", {Color = THEME.Accent, Thickness = 1, Transparency = 0.6}, main)
+    Name = "Main", Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1),
+    BorderSizePixel = 0, ClipsDescendants = true,
+}, root)
+corner(main, 16)
+gradient(main, Color3.fromRGB(19, 16, 30), Color3.fromRGB(10, 10, 16), 90)
+gradient(stroke(main, Color3.new(1, 1, 1), 1, 0.55), THEME.Accent, THEME.Accent2, 45)
 
-local uiScale = new("UIScale", {Scale = (workspace.CurrentCamera.ViewportSize.X < 650) and 0.78 or 1}, gui)
+-- Cabeçalho
+local top = new("Frame", {Size = UDim2.new(1, 0, 0, 46), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0}, main)
+gradient(top, Color3.fromRGB(28, 24, 44), Color3.fromRGB(20, 20, 30), 0)
+local topLine = new("Frame", {
+    AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1), Size = UDim2.new(1, 0, 0, 1),
+    BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, BackgroundTransparency = 0.35,
+}, top)
+gradient(topLine, THEME.Accent, THEME.Accent2, 0)
 
--- Barra superior
-local top = new("Frame", {Size = UDim2.new(1, 0, 0, 38), BackgroundColor3 = THEME.Panel, BorderSizePixel = 0}, main)
-new("Frame", {Size = UDim2.fromOffset(8, 8), Position = UDim2.fromOffset(14, 15), BackgroundColor3 = THEME.Accent}, top)
-corner(top:FindFirstChildOfClass("Frame"), 4)
+local logoBox = new("TextLabel", {
+    Position = UDim2.fromOffset(12, 8), Size = UDim2.fromOffset(30, 30), BackgroundColor3 = Color3.new(1, 1, 1),
+    Text = "◈", TextColor3 = Color3.new(1, 1, 1), Font = Enum.Font.GothamBold, TextSize = 17,
+}, top)
+corner(logoBox, 9)
+gradient(logoBox, THEME.Accent, THEME.Accent2, 45)
 new("TextLabel", {
-    Position = UDim2.fromOffset(30, 0), Size = UDim2.new(1, -100, 1, 0),
-    BackgroundTransparency = 1, Text = HUB_NAME,
-    TextColor3 = THEME.Text, Font = Enum.Font.GothamBold, TextSize = 14,
+    Position = UDim2.fromOffset(52, 6), Size = UDim2.new(1, -150, 0, 20), BackgroundTransparency = 1,
+    Text = "Okkotsu Hub", TextColor3 = THEME.Text, Font = Enum.Font.GothamBold, TextSize = 15,
     TextXAlignment = Enum.TextXAlignment.Left,
+}, top)
+new("TextLabel", {
+    Position = UDim2.fromOffset(52, 24), Size = UDim2.new(1, -150, 0, 14), BackgroundTransparency = 1,
+    Text = "Universal Version  •  RightCtrl minimiza", TextColor3 = THEME.Sub, Font = Enum.Font.GothamMedium,
+    TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left,
 }, top)
 
 local function topButton(text, xOffset, hoverColor)
     local b = new("TextButton", {
         AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, xOffset, 0.5, 0),
-        Size = UDim2.fromOffset(26, 26), BackgroundColor3 = THEME.Panel2,
+        Size = UDim2.fromOffset(28, 28), BackgroundColor3 = THEME.Panel2,
         Text = text, TextColor3 = THEME.Text, Font = Enum.Font.GothamBold, TextSize = 16,
         AutoButtonColor = false,
     }, top)
-    corner(b, 7)
-    b.MouseEnter:Connect(function() tween(b, 0.15, {BackgroundColor3 = hoverColor}) end)
-    b.MouseLeave:Connect(function() tween(b, 0.15, {BackgroundColor3 = THEME.Panel2}) end)
+    corner(b, 8)
+    hover(b, THEME.Panel2, hoverColor)
     return b
 end
-local btnMin   = topButton("–", -42, THEME.Accent)
-local btnClose = topButton("×", -10, Color3.fromRGB(220, 70, 80))
+local btnMin   = topButton("–", -46, THEME.Accent)
+local btnClose = topButton("×", -12, THEME.Bad)
 
 -- Sidebar
-local sidebar = new("ScrollingFrame", {
-    Position = UDim2.fromOffset(0, 38), Size = UDim2.new(0, 120, 1, -38),
-    BackgroundColor3 = THEME.Panel, BorderSizePixel = 0,
-    ScrollBarThickness = 0, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y,
+local sidebar = new("Frame", {
+    Position = UDim2.fromOffset(0, 46), Size = UDim2.new(0, 150, 1, -46),
+    BackgroundColor3 = THEME.Panel, BackgroundTransparency = 0.25, BorderSizePixel = 0,
 }, main)
-new("UIListLayout", {Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder}, sidebar)
-new("UIPadding", {PaddingTop = UDim.new(0, 10), PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8)}, sidebar)
+new("Frame", {
+    AnchorPoint = Vector2.new(1, 0), Position = UDim2.fromScale(1, 0), Size = UDim2.new(0, 1, 1, 0),
+    BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.92, BorderSizePixel = 0,
+}, sidebar)
+
+local tabList = new("ScrollingFrame", {
+    Size = UDim2.new(1, -1, 1, -62), BackgroundTransparency = 1, BorderSizePixel = 0,
+    ScrollBarThickness = 0, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y,
+}, sidebar)
+new("UIListLayout", {Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder}, tabList)
+new("UIPadding", {PaddingTop = UDim.new(0, 10), PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8)}, tabList)
+
+-- Cartão do jogador
+local userCard = new("Frame", {
+    AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -8), Size = UDim2.new(1, -16, 0, 44),
+    BackgroundColor3 = THEME.Panel2, BorderSizePixel = 0,
+}, sidebar)
+corner(userCard, 10)
+stroke(userCard, Color3.new(1, 1, 1), 1, 0.92)
+local avatar = new("ImageLabel", {
+    Position = UDim2.fromOffset(6, 6), Size = UDim2.fromOffset(32, 32), BackgroundColor3 = THEME.Off, Image = "",
+}, userCard)
+corner(avatar, 16)
+task.spawn(function()
+    local ok, img = pcall(function()
+        return Players:GetUserThumbnailAsync(LP.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+    end)
+    if ok and img then avatar.Image = img end
+end)
+new("TextLabel", {
+    Position = UDim2.fromOffset(44, 6), Size = UDim2.new(1, -50, 0, 18), BackgroundTransparency = 1,
+    Text = LP.DisplayName, TextColor3 = THEME.Text, Font = Enum.Font.GothamBold, TextSize = 12,
+    TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
+}, userCard)
+new("TextLabel", {
+    Position = UDim2.fromOffset(44, 23), Size = UDim2.new(1, -50, 0, 14), BackgroundTransparency = 1,
+    Text = "@" .. LP.Name, TextColor3 = THEME.Sub, Font = Enum.Font.GothamMedium, TextSize = 10,
+    TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
+}, userCard)
 
 -- Área de conteúdo
 local content = new("Frame", {
-    Position = UDim2.fromOffset(128, 46), Size = UDim2.new(1, -136, 1, -54),
-    BackgroundTransparency = 1,
+    Position = UDim2.fromOffset(162, 56), Size = UDim2.new(1, -174, 1, -66), BackgroundTransparency = 1,
 }, main)
 
 ----------------------------------------------------------------
@@ -307,73 +469,102 @@ local function makeDraggable(handle, target)
     end)
     connect(UIS.InputChanged, function(i)
         if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
-            local d = (i.Position - startInput) / uiScale.Scale
+            local d = i.Position - startInput
             target.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
         end
     end)
 end
-makeDraggable(top, main)
+makeDraggable(top, root)
 
 ----------------------------------------------------------------
 -- Componentes
 ----------------------------------------------------------------
+local function rowBase(scroll, h)
+    local row = new("Frame", {Size = UDim2.new(1, 0, 0, h), BackgroundColor3 = THEME.Panel, BorderSizePixel = 0}, scroll)
+    corner(row, 10)
+    local st = stroke(row, Color3.new(1, 1, 1), 1, 0.93)
+    return row, st
+end
+
 local function Toggle(scroll, text, cb)
-    local row = new("Frame", {Size = UDim2.new(1, 0, 0, 36), BackgroundColor3 = THEME.Panel, BorderSizePixel = 0}, scroll)
-    corner(row, 8)
+    local row, st = rowBase(scroll, 40)
     new("TextLabel", {
-        Position = UDim2.fromOffset(12, 0), Size = UDim2.new(1, -70, 1, 0), BackgroundTransparency = 1,
+        Position = UDim2.fromOffset(16, 0), Size = UDim2.new(1, -80, 1, 0), BackgroundTransparency = 1,
         Text = text, TextColor3 = THEME.Text, Font = Enum.Font.GothamMedium, TextSize = 13,
         TextXAlignment = Enum.TextXAlignment.Left,
     }, row)
-    local track = new("TextButton", {
-        AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0),
-        Size = UDim2.fromOffset(38, 20), BackgroundColor3 = THEME.Off, Text = "", AutoButtonColor = false,
+    local accentBar = new("Frame", {
+        AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.fromScale(0, 0.5), Size = UDim2.fromOffset(3, 0),
+        BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0,
     }, row)
-    corner(track, 10)
-    local knob = new("Frame", {Size = UDim2.fromOffset(14, 14), Position = UDim2.fromOffset(3, 3), BackgroundColor3 = Color3.new(1, 1, 1)}, track)
-    corner(knob, 7)
+    corner(accentBar, 2)
+    gradient(accentBar, THEME.Accent, THEME.Accent2, 90)
+    local track = new("Frame", {
+        AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0),
+        Size = UDim2.fromOffset(42, 22), BackgroundColor3 = THEME.Off, BorderSizePixel = 0,
+    }, row)
+    corner(track, 11)
+    local knob = new("Frame", {Size = UDim2.fromOffset(16, 16), Position = UDim2.fromOffset(3, 3), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0}, track)
+    corner(knob, 8)
+    local hit = new("TextButton", {Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "", ZIndex = 2}, row)
+    hit.MouseEnter:Connect(function() tween(row, 0.15, {BackgroundColor3 = THEME.Panel2}) end)
+    hit.MouseLeave:Connect(function() tween(row, 0.15, {BackgroundColor3 = THEME.Panel}) end)
 
     local state = false
     local function set(v)
         state = v
         tween(track, 0.2, {BackgroundColor3 = v and THEME.Accent or THEME.Off})
-        tween(knob, 0.25, {Position = v and UDim2.fromOffset(21, 3) or UDim2.fromOffset(3, 3)}, Enum.EasingStyle.Back)
+        tween(knob, 0.25, {Position = v and UDim2.fromOffset(23, 3) or UDim2.fromOffset(3, 3)}, Enum.EasingStyle.Back)
+        tween(accentBar, 0.25, {Size = UDim2.fromOffset(3, v and 20 or 0)})
+        tween(st, 0.25, {Color = v and THEME.Accent or Color3.new(1, 1, 1), Transparency = v and 0.55 or 0.93})
         task.spawn(cb, v)
     end
-    track.MouseButton1Click:Connect(function() set(not state) end)
+    hit.MouseButton1Click:Connect(function() set(not state) end)
     return set
 end
 
 local function Slider(scroll, text, min, max, default, cb)
-    local row = new("Frame", {Size = UDim2.new(1, 0, 0, 50), BackgroundColor3 = THEME.Panel, BorderSizePixel = 0}, scroll)
-    corner(row, 8)
+    local row = rowBase(scroll, 56)
     new("TextLabel", {
-        Position = UDim2.fromOffset(12, 4), Size = UDim2.new(1, -70, 0, 20), BackgroundTransparency = 1,
+        Position = UDim2.fromOffset(16, 6), Size = UDim2.new(1, -90, 0, 20), BackgroundTransparency = 1,
         Text = text, TextColor3 = THEME.Text, Font = Enum.Font.GothamMedium, TextSize = 13,
         TextXAlignment = Enum.TextXAlignment.Left,
     }, row)
     local valueLabel = new("TextLabel", {
-        AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 4), Size = UDim2.fromOffset(50, 20),
-        BackgroundTransparency = 1, Text = tostring(default), TextColor3 = THEME.Accent,
-        Font = Enum.Font.GothamBold, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Right,
+        AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 6), Size = UDim2.fromOffset(52, 20),
+        BackgroundColor3 = THEME.Panel2, Text = tostring(default), TextColor3 = THEME.Accent,
+        Font = Enum.Font.GothamBold, TextSize = 12,
     }, row)
-    local bar = new("Frame", {Position = UDim2.new(0, 12, 0, 34), Size = UDim2.new(1, -24, 0, 6), BackgroundColor3 = THEME.Off, BorderSizePixel = 0}, row)
+    corner(valueLabel, 6)
+    local bar = new("Frame", {Position = UDim2.new(0, 16, 0, 38), Size = UDim2.new(1, -32, 0, 6), BackgroundColor3 = THEME.Off, BorderSizePixel = 0}, row)
     corner(bar, 3)
-    local startRel = (default - min) / (max - min)
-    local fill = new("Frame", {Size = UDim2.fromScale(startRel, 1), BackgroundColor3 = THEME.Accent, BorderSizePixel = 0}, bar)
+    local startRel = math.clamp((default - min) / (max - min), 0, 1)
+    local fill = new("Frame", {Size = UDim2.fromScale(startRel, 1), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0}, bar)
     corner(fill, 3)
+    gradient(fill, THEME.Accent, THEME.Accent2, 0)
+    local knob = new("Frame", {
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(startRel, 0, 0.5, 0), Size = UDim2.fromOffset(14, 14),
+        BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0,
+    }, bar)
+    corner(knob, 7)
+    stroke(knob, THEME.Accent, 2, 0)
+    local hit = new("TextButton", {
+        Position = UDim2.fromOffset(10, 28), Size = UDim2.new(1, -20, 0, 26), BackgroundTransparency = 1, Text = "",
+    }, row)
 
     local dragging = false
     local function update(x)
         local rel = math.clamp((x - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
         local val = math.floor(min + (max - min) * rel + 0.5)
-        tween(fill, 0.08, {Size = UDim2.fromScale(rel, 1)})
+        tween(fill, 0.06, {Size = UDim2.fromScale(rel, 1)})
+        tween(knob, 0.06, {Position = UDim2.new(rel, 0, 0.5, 0)})
         valueLabel.Text = tostring(val)
         cb(val)
     end
-    bar.InputBegan:Connect(function(i)
+    hit.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
             dragging = true
+            tween(knob, 0.15, {Size = UDim2.fromOffset(18, 18)}, Enum.EasingStyle.Back)
             update(i.Position.X)
         end
     end)
@@ -383,23 +574,39 @@ local function Slider(scroll, text, min, max, default, cb)
         end
     end)
     connect(UIS.InputEnded, function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+        if dragging and (i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch) then
             dragging = false
+            tween(knob, 0.2, {Size = UDim2.fromOffset(14, 14)})
         end
     end)
 end
 
 local function Button(scroll, text, cb)
     local b = new("TextButton", {
-        Size = UDim2.new(1, 0, 0, 36), BackgroundColor3 = THEME.Panel, Text = text,
+        Size = UDim2.new(1, 0, 0, 38), BackgroundColor3 = THEME.Panel, Text = text,
         TextColor3 = THEME.Text, Font = Enum.Font.GothamMedium, TextSize = 13, AutoButtonColor = false,
+        TextXAlignment = Enum.TextXAlignment.Left,
     }, scroll)
-    corner(b, 8)
-    b.MouseEnter:Connect(function() tween(b, 0.15, {BackgroundColor3 = THEME.Panel2}) end)
-    b.MouseLeave:Connect(function() tween(b, 0.15, {BackgroundColor3 = THEME.Panel}) end)
+    corner(b, 10)
+    local st = stroke(b, Color3.new(1, 1, 1), 1, 0.93)
+    new("UIPadding", {PaddingLeft = UDim.new(0, 16)}, b)
+    local arrow = new("TextLabel", {
+        AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -2, 0.5, 0), Size = UDim2.fromOffset(20, 20),
+        BackgroundTransparency = 1, Text = "›", TextColor3 = THEME.Sub, Font = Enum.Font.GothamBold, TextSize = 18,
+    }, b)
+    b.MouseEnter:Connect(function()
+        tween(b, 0.15, {BackgroundColor3 = THEME.Panel2})
+        tween(st, 0.15, {Color = THEME.Accent, Transparency = 0.6})
+        tween(arrow, 0.15, {TextColor3 = THEME.Accent})
+    end)
+    b.MouseLeave:Connect(function()
+        tween(b, 0.15, {BackgroundColor3 = THEME.Panel})
+        tween(st, 0.15, {Color = Color3.new(1, 1, 1), Transparency = 0.93})
+        tween(arrow, 0.15, {TextColor3 = THEME.Sub})
+    end)
     b.MouseButton1Click:Connect(function()
         tween(b, 0.08, {BackgroundColor3 = THEME.Accent})
-        task.delay(0.1, function() tween(b, 0.25, {BackgroundColor3 = THEME.Panel}) end)
+        task.delay(0.1, function() tween(b, 0.3, {BackgroundColor3 = THEME.Panel2}) end)
         task.spawn(cb)
     end)
     return b
@@ -407,33 +614,39 @@ end
 
 local function TextInput(scroll, placeholder)
     local box = new("TextBox", {
-        Size = UDim2.new(1, 0, 0, 36), BackgroundColor3 = THEME.Panel, Text = "",
+        Size = UDim2.new(1, 0, 0, 38), BackgroundColor3 = THEME.Panel, Text = "",
         PlaceholderText = placeholder, PlaceholderColor3 = THEME.Sub, TextColor3 = THEME.Text,
         Font = Enum.Font.GothamMedium, TextSize = 13, ClearTextOnFocus = false,
+        TextXAlignment = Enum.TextXAlignment.Left,
     }, scroll)
-    corner(box, 8)
-    local stroke = new("UIStroke", {Color = THEME.Accent, Thickness = 1, Transparency = 1}, box)
-    box.Focused:Connect(function() tween(stroke, 0.2, {Transparency = 0.2}) end)
-    box.FocusLost:Connect(function() tween(stroke, 0.2, {Transparency = 1}) end)
+    corner(box, 10)
+    new("UIPadding", {PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 12)}, box)
+    local st = stroke(box, Color3.new(1, 1, 1), 1, 0.93)
+    box.Focused:Connect(function() tween(st, 0.2, {Color = THEME.Accent, Transparency = 0.2}) end)
+    box.FocusLost:Connect(function() tween(st, 0.2, {Color = Color3.new(1, 1, 1), Transparency = 0.93}) end)
     return box
 end
 
--- Título de seção (para separar os grupos dentro de uma aba mesclada)
 local function Section(scroll, text)
-    return new("TextLabel", {
-        Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Text = "▸ " .. text,
+    local l = new("TextLabel", {
+        Size = UDim2.new(1, 0, 0, 24), BackgroundTransparency = 1, Text = "▸ " .. text,
         TextColor3 = THEME.Accent, Font = Enum.Font.GothamBold, TextSize = 12,
         TextXAlignment = Enum.TextXAlignment.Left,
     }, scroll)
+    new("Frame", {
+        AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1), Size = UDim2.new(1, 0, 0, 1),
+        BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.93, BorderSizePixel = 0,
+    }, l)
+    return l
 end
 
 ----------------------------------------------------------------
--- Abas (todas com a marca d'água)
+-- Abas
 ----------------------------------------------------------------
 local pages, tabButtons = {}, {}
 local currentTab
+local selectTab
 
--- Abas mescladas: o nome antigo aponta para a aba que o recebe
 local TAB_ALIAS = {
     ["Movimento"]  = "Jogador",
     ["Personagem"] = "Jogador",
@@ -442,10 +655,13 @@ local TAB_ALIAS = {
     ["Utilidades"] = "Misc",
     ["Efeitos"]    = "Aparência",
 }
--- Ordem das abas na barra lateral
 local TAB_ORDER = {
     ["Jogador"] = 1, ["Teleporte"] = 2, ["Visual"] = 3, ["Mundo"] = 4,
-    ["Aparência"] = 5, ["Música"] = 6, ["Misc"] = 7,
+    ["Aparência"] = 5, ["Música"] = 6, ["Misc"] = 7, ["Discord"] = 8,
+}
+local TAB_ICON = {
+    ["Buscar"] = "🔍", ["Jogador"] = "🏃", ["Teleporte"] = "📍", ["Visual"] = "👁", ["Mundo"] = "🌍",
+    ["Aparência"] = "✨", ["Música"] = "🎵", ["Misc"] = "⚙", ["Discord"] = "💬",
 }
 
 local function createTab(name)
@@ -453,30 +669,41 @@ local function createTab(name)
     if pages[name] then
         return pages[name]:FindFirstChildOfClass("ScrollingFrame")
     end
-    -- botão da sidebar
     local btn = new("TextButton", {
-        Size = UDim2.new(1, 0, 0, 32), BackgroundColor3 = THEME.Panel2, BackgroundTransparency = 1,
-        LayoutOrder = TAB_ORDER[name] or 99,
-        Text = name, TextColor3 = THEME.Sub, Font = Enum.Font.GothamMedium, TextSize = 13, AutoButtonColor = false,
-    }, sidebar)
-    corner(btn, 8)
+        Size = UDim2.new(1, 0, 0, 34), BackgroundColor3 = THEME.Panel3, BackgroundTransparency = 1,
+        LayoutOrder = TAB_ORDER[name] or 99, Text = "", AutoButtonColor = false,
+    }, tabList)
+    corner(btn, 9)
+    local icon = new("TextLabel", {
+        Position = UDim2.fromOffset(10, 0), Size = UDim2.fromOffset(22, 34), BackgroundTransparency = 1,
+        Text = TAB_ICON[name] or "•", TextSize = 14, Font = Enum.Font.GothamMedium, TextColor3 = THEME.Sub,
+    }, btn)
+    local label = new("TextLabel", {
+        Position = UDim2.fromOffset(38, 0), Size = UDim2.new(1, -44, 1, 0), BackgroundTransparency = 1,
+        Text = name, TextColor3 = THEME.Sub, Font = Enum.Font.GothamMedium, TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, btn)
     local indicator = new("Frame", {
         AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 0, 0.5, 0),
-        Size = UDim2.fromOffset(3, 0), BackgroundColor3 = THEME.Accent, BorderSizePixel = 0,
+        Size = UDim2.fromOffset(3, 0), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0,
     }, btn)
     corner(indicator, 2)
+    gradient(indicator, THEME.Accent, THEME.Accent2, 90)
 
-    -- página
     local page = new("CanvasGroup", {Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, GroupTransparency = 1, Visible = false}, content)
+    new("TextLabel", {
+        Size = UDim2.new(1, 0, 0, 26), BackgroundTransparency = 1, Text = name,
+        TextColor3 = THEME.Text, Font = Enum.Font.GothamBold, TextSize = 19, TextXAlignment = Enum.TextXAlignment.Left,
+    }, page)
     local scroll = new("ScrollingFrame", {
-        Size = UDim2.new(1, 0, 1, -22), BackgroundTransparency = 1, BorderSizePixel = 0,
+        Position = UDim2.fromOffset(0, 32), Size = UDim2.new(1, 0, 1, -54), BackgroundTransparency = 1, BorderSizePixel = 0,
         ScrollBarThickness = 3, ScrollBarImageColor3 = THEME.Accent,
         CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y,
     }, page)
-    local layout = new("UIListLayout", {Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder}, scroll)
-    new("UIPadding", {PaddingRight = UDim.new(0, 6)}, scroll)
+    new("UIListLayout", {Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder}, scroll)
+    new("UIPadding", {PaddingRight = UDim.new(0, 8), PaddingBottom = UDim.new(0, 6)}, scroll)
 
-    -- MARCA D'ÁGUA em todas as abas
+    -- Marca d'água
     new("TextLabel", {
         AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -4, 1, 0), Size = UDim2.new(1, 0, 0, 18),
         BackgroundTransparency = 1, Text = HUB_NAME, TextColor3 = THEME.Accent, TextTransparency = 0.55,
@@ -484,7 +711,7 @@ local function createTab(name)
     }, page)
 
     pages[name] = page
-    tabButtons[name] = {btn = btn, indicator = indicator}
+    tabButtons[name] = {btn = btn, indicator = indicator, label = label, icon = icon}
 
     btn.MouseEnter:Connect(function()
         if currentTab ~= name then tween(btn, 0.15, {BackgroundTransparency = 0.6}) end
@@ -500,7 +727,9 @@ function selectTab(name)
     if currentTab == name then return end
     if currentTab then
         local o = tabButtons[currentTab]
-        tween(o.btn, 0.2, {BackgroundTransparency = 1, TextColor3 = THEME.Sub})
+        tween(o.btn, 0.2, {BackgroundTransparency = 1})
+        tween(o.label, 0.2, {TextColor3 = THEME.Sub})
+        tween(o.icon, 0.2, {TextColor3 = THEME.Sub})
         tween(o.indicator, 0.2, {Size = UDim2.fromOffset(3, 0)})
         local oldPage = pages[currentTab]
         tween(oldPage, 0.15, {GroupTransparency = 1})
@@ -508,10 +737,12 @@ function selectTab(name)
     end
     currentTab = name
     local n = tabButtons[name]
-    tween(n.btn, 0.2, {BackgroundTransparency = 0, TextColor3 = THEME.Text})
+    tween(n.btn, 0.2, {BackgroundTransparency = 0.35})
+    tween(n.label, 0.2, {TextColor3 = THEME.Text})
+    tween(n.icon, 0.2, {TextColor3 = THEME.Text})
     tween(n.indicator, 0.25, {Size = UDim2.fromOffset(3, 18)}, Enum.EasingStyle.Back)
     local p = pages[name]
-    p.Position = UDim2.fromOffset(0, 12)
+    p.Position = UDim2.fromOffset(0, 14)
     p.Visible = true
     tween(p, 0.3, {GroupTransparency = 0, Position = UDim2.fromOffset(0, 0)})
 end
@@ -519,7 +750,6 @@ end
 ----------------------------------------------------------------
 -- Funcionalidades
 ----------------------------------------------------------------
--- Speed / Jump (aplicado continuamente para sobreviver a respawns)
 connect(RunService.Heartbeat, function()
     local hum = getHum()
     if not hum then return end
@@ -530,7 +760,6 @@ connect(RunService.Heartbeat, function()
     end
 end)
 
--- Infinite Jump
 connect(UIS.JumpRequest, function()
     if S.infJump then
         local hum = getHum()
@@ -538,7 +767,6 @@ connect(UIS.JumpRequest, function()
     end
 end)
 
--- Noclip
 connect(RunService.Stepped, function()
     if S.noclip and LP.Character then
         for _, p in ipairs(LP.Character:GetDescendants()) do
@@ -547,7 +775,7 @@ connect(RunService.Stepped, function()
     end
 end)
 
--- Fly (WASD / analógico + Espaço sobe, Ctrl desce; no celular, olhe pra cima/baixo)
+-- Fly (WASD / analógico + Espaço sobe, Ctrl desce)
 local flyConn, bv, bg
 local function stopFly()
     if flyConn then flyConn:Disconnect() flyConn = nil end
@@ -579,7 +807,6 @@ connect(LP.CharacterAdded, function()
     if S.fly then task.wait(1) startFly() end
 end)
 
--- View (espectar jogador)
 local function findPlayer(txt)
     txt = txt:lower()
     if txt == "" then return nil end
@@ -596,9 +823,9 @@ local function addESP(p)
     if p == LP then return end
     local function apply(char)
         if not char then return end
-        local old = espFolder:FindFirstChild(p.Name)
-        if old then old:Destroy() end
-        local h = new("Highlight", {
+        local o = espFolder:FindFirstChild(p.Name)
+        if o then o:Destroy() end
+        new("Highlight", {
             Name = p.Name, Adornee = char, FillColor = THEME.Accent, OutlineColor = Color3.new(1, 1, 1),
             FillTransparency = 0.6, DepthMode = Enum.HighlightDepthMode.AlwaysOnTop, Enabled = S.esp,
         }, espFolder)
@@ -613,13 +840,11 @@ connect(Players.PlayerRemoving, function(p)
     if h then h:Destroy() end
 end)
 
--- Fullbright
 local origLight = {
     Brightness = Lighting.Brightness, ClockTime = Lighting.ClockTime,
     GlobalShadows = Lighting.GlobalShadows, Ambient = Lighting.Ambient,
 }
 
--- Anti-AFK
 connect(LP.Idled, function()
     if S.antiAfk then
         VirtualUser:CaptureController()
@@ -627,10 +852,29 @@ connect(LP.Idled, function()
     end
 end)
 
+local cleanups = {}
+local function onCleanup(f) table.insert(cleanups, f) end
+local function cam() return workspace.CurrentCamera end
+local DEFAULT_GRAVITY = workspace.Gravity
+
+local function copy(text, label)
+    local fn = setclipboard or toclipboard
+    if fn then
+        pcall(fn, text)
+        notify((label or "Texto") .. " copiado")
+    else
+        notify("Área de transferência indisponível")
+    end
+end
+
+local function tpTo(cf)
+    local r = getHRP()
+    if r then r.CFrame = cf end
+end
+
 ----------------------------------------------------------------
--- Montagem das abas
+-- Aba: Jogador (Jogador + Movimento + Personagem)
 ----------------------------------------------------------------
--- Jogador
 local tPlayer = createTab("Jogador")
 Section(tPlayer, "Jogador")
 local setSpeed = Toggle(tPlayer, "Speed", function(v) S.speedOn = v
@@ -644,7 +888,6 @@ Slider(tPlayer, "Força do pulo", 50, 400, S.jump, function(v) S.jump = v end)
 Toggle(tPlayer, "Pulo infinito", function(v) S.infJump = v end)
 Slider(tPlayer, "Gravidade", 0, 300, math.floor(workspace.Gravity), function(v) workspace.Gravity = v end)
 
--- Movimento
 local tMove = createTab("Movimento")
 Section(tMove, "Movimento")
 local setFly = Toggle(tMove, "Fly", function(v)
@@ -654,7 +897,88 @@ end)
 Slider(tMove, "Velocidade do Fly", 10, 300, S.flySpeed, function(v) S.flySpeed = v end)
 local setNoclip = Toggle(tMove, "Noclip", function(v) S.noclip = v end)
 
--- Visual
+do
+    local t = createTab("Personagem")
+    Section(t, "Personagem")
+
+    Toggle(t, "Vida infinita (client)", function(v)
+        S.god = v
+        if not v then
+            local h = getHum()
+            if h then h.MaxHealth = 100 h.Health = 100 end
+        end
+    end)
+    Toggle(t, "Auto-curar", function(v) S.autoheal = v end)
+    Toggle(t, "Auto-pular", function(v) S.autojump = v end)
+    connect(RunService.Heartbeat, function()
+        local h = getHum()
+        if not h then return end
+        if S.god then
+            h.MaxHealth = math.huge
+            h.Health = math.huge
+        elseif S.autoheal and h.Health < h.MaxHealth then
+            h.Health = h.MaxHealth
+        end
+        if S.autojump and h.FloorMaterial ~= Enum.Material.Air then h.Jump = true end
+    end)
+
+    local spinSpeed = 10
+    Toggle(t, "Girar personagem", function(v) S.spin = v end)
+    Slider(t, "Velocidade do giro", 1, 50, spinSpeed, function(v) spinSpeed = v end)
+    connect(RunService.RenderStepped, function()
+        local r = getHRP()
+        if S.spin and r then r.CFrame *= CFrame.Angles(0, math.rad(spinSpeed), 0) end
+    end)
+
+    Toggle(t, "Congelar personagem", function(v)
+        local r = getHRP()
+        if r then r.Anchored = v end
+    end)
+    onCleanup(function() local r = getHRP() if r then r.Anchored = false end end)
+
+    Toggle(t, "Sprint (segurar Shift)", function(v) S.sprint = v end)
+    local wasSprint = false
+    connect(RunService.Heartbeat, function()
+        local h = getHum()
+        if not h then return end
+        local active = S.sprint and UIS:IsKeyDown(Enum.KeyCode.LeftShift)
+        if active then
+            h.WalkSpeed = math.max(S.speedOn and S.speed or 16, 40)
+            wasSprint = true
+        elseif wasSprint then
+            wasSprint = false
+            if not S.speedOn then h.WalkSpeed = 16 end
+        end
+    end)
+
+    Button(t, "Dash (impulso para frente)", function()
+        local r = getHRP()
+        if r then r.AssemblyLinearVelocity = r.CFrame.LookVector * 120 + Vector3.new(0, 20, 0) end
+    end)
+    Button(t, "Sentar", function()
+        local h = getHum()
+        if h then h.Sit = true end
+    end)
+    Toggle(t, "Remover animações", function(v)
+        local c = LP.Character
+        local a = c and c:FindFirstChild("Animate")
+        if a then a.Disabled = v end
+        if v then
+            local h = getHum()
+            local an = h and h:FindFirstChildOfClass("Animator")
+            if an then for _, tr in ipairs(an:GetPlayingAnimationTracks()) do tr:Stop() end end
+        end
+    end)
+    onCleanup(function()
+        local c = LP.Character
+        local a = c and c:FindFirstChild("Animate")
+        if a then a.Disabled = false end
+    end)
+end
+
+----------------------------------------------------------------
+-- Aba: Visual
+----------------------------------------------------------------
 local tVisual = createTab("Visual")
 Section(tVisual, "Visual")
 local viewBox = TextInput(tVisual, "Nome do jogador (parcial)")
@@ -691,142 +1015,13 @@ Slider(tVisual, "Campo de visão (FOV)", 30, 120, S.fov, function(v)
     workspace.CurrentCamera.FieldOfView = v
 end)
 
--- Misc
-local tMisc = createTab("Misc")
-Section(tMisc, "Misc")
-Toggle(tMisc, "Anti-AFK", function(v) S.antiAfk = v end)
-Button(tMisc, "Resetar personagem", function()
-    local h = getHum()
-    if h then h.Health = 0 end
-end)
-Button(tMisc, "Rejoin (reentrar no servidor)", function()
-    TeleportService:Teleport(game.PlaceId, LP)
-end)
-
-
 ----------------------------------------------------------------
--- +50 OPÇÕES EXTRAS
-----------------------------------------------------------------
-local cleanups = {}
-local function onCleanup(f) table.insert(cleanups, f) end
-local function cam() return workspace.CurrentCamera end
-local DEFAULT_GRAVITY = workspace.Gravity
-
-local function copy(text, label)
-    local fn = setclipboard or toclipboard
-    if fn then
-        pcall(fn, text)
-        notify((label or "Texto") .. " copiado")
-    else
-        notify("Área de transferência indisponível")
-    end
-end
-
-local function tpTo(cf)
-    local r = getHRP()
-    if r then r.CFrame = cf end
-end
-
-----------------------------------------------------------------
--- ABA: Personagem (opções 1-10)
-----------------------------------------------------------------
-do
-    local t = createTab("Personagem")
-    Section(t, "Personagem")
-
-    -- 1. Vida infinita (client)
-    Toggle(t, "Vida infinita (client)", function(v)
-        S.god = v
-        if not v then
-            local h = getHum()
-            if h then h.MaxHealth = 100 h.Health = 100 end
-        end
-    end)
-    -- 2. Auto-curar
-    Toggle(t, "Auto-curar", function(v) S.autoheal = v end)
-    -- 3. Auto-pular
-    Toggle(t, "Auto-pular", function(v) S.autojump = v end)
-    connect(RunService.Heartbeat, function()
-        local h = getHum()
-        if not h then return end
-        if S.god then
-            h.MaxHealth = math.huge
-            h.Health = math.huge
-        elseif S.autoheal and h.Health < h.MaxHealth then
-            h.Health = h.MaxHealth
-        end
-        if S.autojump and h.FloorMaterial ~= Enum.Material.Air then h.Jump = true end
-    end)
-
-    -- 4/5. Girar + velocidade do giro
-    local spinSpeed = 10
-    Toggle(t, "Girar personagem", function(v) S.spin = v end)
-    Slider(t, "Velocidade do giro", 1, 50, spinSpeed, function(v) spinSpeed = v end)
-    connect(RunService.RenderStepped, function()
-        local r = getHRP()
-        if S.spin and r then r.CFrame *= CFrame.Angles(0, math.rad(spinSpeed), 0) end
-    end)
-
-    -- 6. Congelar
-    Toggle(t, "Congelar personagem", function(v)
-        local r = getHRP()
-        if r then r.Anchored = v end
-    end)
-    onCleanup(function() local r = getHRP() if r then r.Anchored = false end end)
-
-    -- 7. Sprint com Shift
-    Toggle(t, "Sprint (segurar Shift)", function(v) S.sprint = v end)
-    local wasSprint = false
-    connect(RunService.Heartbeat, function()
-        local h = getHum()
-        if not h then return end
-        local active = S.sprint and UIS:IsKeyDown(Enum.KeyCode.LeftShift)
-        if active then
-            h.WalkSpeed = math.max(S.speedOn and S.speed or 16, 40)
-            wasSprint = true
-        elseif wasSprint then
-            wasSprint = false
-            if not S.speedOn then h.WalkSpeed = 16 end
-        end
-    end)
-
-    -- 8. Dash
-    Button(t, "Dash (impulso para frente)", function()
-        local r = getHRP()
-        if r then r.AssemblyLinearVelocity = r.CFrame.LookVector * 120 + Vector3.new(0, 20, 0) end
-    end)
-
-    -- 9. Sentar
-    Button(t, "Sentar", function()
-        local h = getHum()
-        if h then h.Sit = true end
-    end)
-
-    -- 10. Remover animações
-    Toggle(t, "Remover animações", function(v)
-        local c = LP.Character
-        local a = c and c:FindFirstChild("Animate")
-        if a then a.Disabled = v end
-        if v then
-            local h = getHum()
-            local an = h and h:FindFirstChildOfClass("Animator")
-            if an then for _, tr in ipairs(an:GetPlayingAnimationTracks()) do tr:Stop() end end
-        end
-    end)
-    onCleanup(function()
-        local c = LP.Character
-        local a = c and c:FindFirstChild("Animate")
-        if a then a.Disabled = false end
-    end)
-end
-
-----------------------------------------------------------------
--- ABA: Teleporte (opções 11-18)
+-- Aba: Teleporte
 ----------------------------------------------------------------
 do
     local t = createTab("Teleporte")
+    Section(t, "Teleporte")
 
-    -- 11. Click TP
     Toggle(t, "Click TP (Ctrl + clique)", function(v) S.clickTP = v end)
     local mouse = LP:GetMouse()
     connect(mouse.Button1Down, function()
@@ -835,7 +1030,6 @@ do
         end
     end)
 
-    -- 12. TP até jogador
     local tpBox = TextInput(t, "Nome do jogador (parcial)")
     Button(t, "Teleportar até o jogador", function()
         local p = findPlayer(tpBox.Text)
@@ -848,7 +1042,6 @@ do
         end
     end)
 
-    -- 13. TP jogador aleatório
     Button(t, "TP para jogador aleatório", function()
         local list = {}
         for _, p in ipairs(Players:GetPlayers()) do
@@ -862,7 +1055,6 @@ do
         notify("TP: " .. p.DisplayName)
     end)
 
-    -- 14/15. Salvar e voltar posição
     local saved
     Button(t, "Salvar posição", function()
         local r = getHRP()
@@ -872,19 +1064,16 @@ do
         if saved then tpTo(saved) else notify("Nenhuma posição salva") end
     end)
 
-    -- 16. Spawn
     Button(t, "Ir ao spawn", function()
         local sp = workspace:FindFirstChildWhichIsA("SpawnLocation", true)
         if sp then tpTo(sp.CFrame + Vector3.new(0, 4, 0)) else notify("Spawn não encontrado") end
     end)
 
-    -- 17. Subir 50 studs
     Button(t, "Subir 50 studs", function()
         local r = getHRP()
         if r then r.CFrame += Vector3.new(0, 50, 0) end
     end)
 
-    -- 18. TP por coordenadas
     local coordBox = TextInput(t, "Coordenadas: x, y, z")
     Button(t, "Teleportar para coordenadas", function()
         local x, y, z = coordBox.Text:match("(-?[%d%.]+)%s*,%s*(-?[%d%.]+)%s*,%s*(-?[%d%.]+)")
@@ -893,23 +1082,19 @@ do
 end
 
 ----------------------------------------------------------------
--- ABA: Mundo (opções 19-28)
+-- Aba: Mundo (+ Câmera)
 ----------------------------------------------------------------
 do
     local t = createTab("Mundo")
     Section(t, "Mundo")
 
-    -- 19. Hora do dia
     Slider(t, "Hora do dia", 0, 24, math.floor(Lighting.ClockTime), function(v) Lighting.ClockTime = v end)
-    -- 20. Ciclo dia/noite
     Toggle(t, "Ciclo dia/noite", function(v) S.cycle = v end)
     connect(RunService.Heartbeat, function(dt)
         if S.cycle then Lighting.ClockTime = (Lighting.ClockTime + dt * 0.5) % 24 end
     end)
-    -- 21. Brilho
     Slider(t, "Brilho", 0, 10, math.clamp(math.floor(Lighting.Brightness), 0, 10), function(v) Lighting.Brightness = v end)
 
-    -- 22. Sem neblina
     local origFog = {Lighting.FogStart, Lighting.FogEnd}
     local atm = Lighting:FindFirstChildOfClass("Atmosphere")
     local origDensity = atm and atm.Density
@@ -923,18 +1108,16 @@ do
         end
     end)
 
-    -- 23. Sem sombras
     local origShadows = Lighting.GlobalShadows
     Toggle(t, "Sem sombras", function(v) Lighting.GlobalShadows = (not v) and origShadows or false end)
 
-    -- 24. Remover pós-processamento
     Toggle(t, "Remover pós-processamento", function(v)
         for _, e in ipairs(Lighting:GetChildren()) do
             if e:IsA("PostEffect") then e.Enabled = not v end
         end
     end)
 
-    -- 25. X-Ray (OTIMIZADO: processa em lotes, sem travar, e acompanha peças novas)
+    -- X-Ray (processa em lotes e acompanha peças novas)
     local xrayParts, xrayConn, xrayToken = {}, nil, 0
     local function xrayValid(p)
         if not p:IsA("BasePart") or p:IsA("Terrain") then return false end
@@ -950,14 +1133,12 @@ do
         local token = xrayToken
         if xrayConn then xrayConn:Disconnect() xrayConn = nil end
         if v then
-            -- peças criadas depois também ficam transparentes
             xrayConn = workspace.DescendantAdded:Connect(function(d)
                 if token == xrayToken and xrayValid(d) then
                     xrayParts[d] = true
                     d.LocalTransparencyModifier = 0.6
                 end
             end)
-            -- varredura em lotes (não congela o jogo)
             task.spawn(function()
                 local all = workspace:GetDescendants()
                 for i = 1, #all do
@@ -971,7 +1152,6 @@ do
                 end
             end)
         else
-            -- restauração também em lotes
             local list = {}
             for p in pairs(xrayParts) do list[#list + 1] = p end
             xrayParts = {}
@@ -994,7 +1174,6 @@ do
         xrayParts = {}
     end)
 
-    -- 26. Gráficos baixos
     Button(t, "Gráficos baixos", function()
         pcall(function() settings().Rendering.QualityLevel = 1 end)
         for _, p in ipairs(workspace:GetDescendants()) do
@@ -1010,7 +1189,6 @@ do
         notify("Gráficos reduzidos")
     end)
 
-    -- 27/28. Gravidade
     Button(t, "Gravidade da Lua", function() workspace.Gravity = 40 end)
     Button(t, "Gravidade normal", function() workspace.Gravity = DEFAULT_GRAVITY end)
 
@@ -1023,29 +1201,20 @@ do
     end)
 end
 
-----------------------------------------------------------------
--- ABA: Câmera (opções 29-34)
-----------------------------------------------------------------
 do
     local t = createTab("Câmera")
     Section(t, "Câmera")
 
-    -- 29. Zoom máximo
     Slider(t, "Zoom máximo", 20, 2000, math.clamp(math.floor(LP.CameraMaxZoomDistance), 20, 2000), function(v)
         LP.CameraMaxZoomDistance = v
     end)
-
-    -- 30. Primeira pessoa forçada
     Toggle(t, "Primeira pessoa forçada", function(v)
         LP.CameraMode = v and Enum.CameraMode.LockFirstPerson or Enum.CameraMode.Classic
     end)
-
-    -- 31. Câmera sem oclusão
     Toggle(t, "Câmera atravessa paredes", function(v)
         LP.DevCameraOcclusionMode = v and Enum.DevCameraOcclusionMode.Invisicam or Enum.DevCameraOcclusionMode.Zoom
     end)
 
-    -- 32. Barras cinematográficas
     local barTop = new("Frame", {Size = UDim2.new(1, 0, 0, 0), BackgroundColor3 = Color3.new(0, 0, 0), BorderSizePixel = 0, ZIndex = 0}, gui)
     local barBot = new("Frame", {
         AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1), Size = UDim2.new(1, 0, 0, 0),
@@ -1057,7 +1226,6 @@ do
         tween(barBot, 0.5, {Size = UDim2.new(1, 0, 0, h)})
     end)
 
-    -- 33. Zoom (segurar Z)
     Toggle(t, "Zoom (segurar Z)", function(v) S.zoomKey = v end)
     local zoomed = false
     connect(RunService.RenderStepped, function()
@@ -1071,7 +1239,6 @@ do
         end
     end)
 
-    -- 34. Resetar câmera
     Button(t, "Resetar câmera", function()
         LP.CameraMode = Enum.CameraMode.Classic
         LP.CameraMaxZoomDistance = 128
@@ -1091,13 +1258,12 @@ do
 end
 
 ----------------------------------------------------------------
--- ABA: Jogadores (opções 35-40)
+-- Aba: Visual (+ Jogadores)
 ----------------------------------------------------------------
 do
     local t = createTab("Jogadores")
     Section(t, "Jogadores")
 
-    -- 35. Nametags com distância
     local tagFolder = new("Folder", {Name = "Tags"}, gui)
     local tags, tagsOn = {}, false
     local function ensureTag(p)
@@ -1139,7 +1305,6 @@ do
         end
     end)
 
-    -- 36. Ocultar nomes de outros jogadores
     Toggle(t, "Ocultar nomes dos outros", function(v)
         for _, p in ipairs(Players:GetPlayers()) do
             local h = p.Character and p.Character:FindFirstChildOfClass("Humanoid")
@@ -1149,20 +1314,18 @@ do
         end
     end)
 
-    -- 37. Info do servidor
     Button(t, "Info do servidor", function()
         notify(#Players:GetPlayers() .. "/" .. Players.MaxPlayers .. " jogadores no servidor")
     end)
-
-    -- 38. Copiar JobId
     Button(t, "Copiar JobId", function() copy(game.JobId, "JobId") end)
 
-    -- 39. Contador FPS / Ping
     local fpsLabel = new("TextLabel", {
-        AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -10, 0, 10), Size = UDim2.fromOffset(170, 20),
-        BackgroundTransparency = 1, TextColor3 = THEME.Text, TextStrokeTransparency = 0.5,
-        Font = Enum.Font.GothamBold, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Right, Visible = false,
+        AnchorPoint = Vector2.new(0, 0), Position = UDim2.new(0, 12, 0, 12), Size = UDim2.fromOffset(170, 24),
+        BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.25, TextColor3 = THEME.Text,
+        Font = Enum.Font.GothamBold, TextSize = 12, Visible = false, ZIndex = 90,
     }, gui)
+    corner(fpsLabel, 8)
+    stroke(fpsLabel, THEME.Accent, 1, 0.6)
     local frames, acc = 0, 0
     connect(RunService.RenderStepped, function(dt)
         if not fpsLabel.Visible then return end
@@ -1173,13 +1336,12 @@ do
             pcall(function()
                 ping = math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
             end)
-            fpsLabel.Text = string.format("FPS %d | Ping %dms", math.floor(frames / acc), ping)
+            fpsLabel.Text = string.format("FPS %d  |  Ping %dms", math.floor(frames / acc), ping)
             frames, acc = 0, 0
         end
     end)
     Toggle(t, "Contador FPS / Ping", function(v) fpsLabel.Visible = v end)
 
-    -- 40. Esconder UI do Roblox
     Toggle(t, "Esconder UI do Roblox", function(v)
         pcall(function() game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.All, not v) end)
     end)
@@ -1189,13 +1351,23 @@ do
 end
 
 ----------------------------------------------------------------
--- ABA: Utilidades (opções 41-50)
+-- Aba: Misc (+ Utilidades)
 ----------------------------------------------------------------
+local tMisc = createTab("Misc")
+Section(tMisc, "Misc")
+Toggle(tMisc, "Anti-AFK", function(v) S.antiAfk = v end)
+Button(tMisc, "Resetar personagem", function()
+    local h = getHum()
+    if h then h.Health = 0 end
+end)
+Button(tMisc, "Rejoin (reentrar no servidor)", function()
+    TeleportService:Teleport(game.PlaceId, LP)
+end)
+
 do
     local t = createTab("Utilidades")
     Section(t, "Utilidades")
 
-    -- 41/42. Executor de scripts
     local box = TextInput(t, "Cole seu script Lua aqui")
     Button(t, "Executar script", function()
         local compile = loadstring
@@ -1212,7 +1384,6 @@ do
     end)
     Button(t, "Limpar caixa de script", function() box.Text = "" end)
 
-    -- 43. Server hop
     Button(t, "Server hop", function()
         notify("Procurando servidor...")
         local ok, result = pcall(function()
@@ -1231,7 +1402,6 @@ do
         notify("Nenhum servidor disponível")
     end)
 
-    -- 44. Auto-clicker (ferramenta equipada)
     Toggle(t, "Auto-clicker (ferramenta)", function(v) S.autoclick = v end)
     task.spawn(function()
         while gui.Parent do
@@ -1243,7 +1413,6 @@ do
         end
     end)
 
-    -- 45. Silenciar sons
     local muted = {}
     Toggle(t, "Silenciar sons do jogo", function(v)
         if v then
@@ -1261,10 +1430,7 @@ do
         for s, vol in pairs(muted) do if s.Parent then s.Volume = vol end end
     end)
 
-    -- 46. Copiar PlaceId
     Button(t, "Copiar PlaceId", function() copy(tostring(game.PlaceId), "PlaceId") end)
-
-    -- 47. Copiar posição
     Button(t, "Copiar posição atual", function()
         local r = getHRP()
         if r then
@@ -1273,12 +1439,10 @@ do
         end
     end)
 
-    -- 48. Escala do hub
-    Slider(t, "Escala do hub", 60, 120, math.floor(uiScale.Scale * 100 + 0.5), function(v)
+    Slider(t, "Escala do hub", 50, 120, math.floor(uiScale.Scale * 100 + 0.5), function(v)
         tween(uiScale, 0.15, {Scale = v / 100})
     end)
 
-    -- 49. Atalhos de teclado
     Toggle(t, "Atalhos (F = Fly, N = Noclip)", function(v) S.hotkeys = v end)
     connect(UIS.InputBegan, function(i, gp)
         if gp or not S.hotkeys then return end
@@ -1289,7 +1453,6 @@ do
         end
     end)
 
-    -- 50. Restaurar padrões
     Button(t, "Restaurar padrões", function()
         setSpeed(false)
         setJump(false)
@@ -1302,15 +1465,12 @@ do
 end
 
 ----------------------------------------------------------------
--- NOVO - ABA: Música
--- Obs.: o Roblox só replica o som para os outros jogadores se o jogo
--- permitir (o servidor filtra o que o cliente cria). O som é colocado
--- no seu personagem com alcance enorme para ser ouvido por quem
--- estiver recebendo a réplica.
+-- Aba: Música
 ----------------------------------------------------------------
 do
   local __ok, __err = pcall(function()
     local t = createTab("Música")
+    Section(t, "Música")
     local SoundService = game:GetService("SoundService")
 
     local sound = new("Sound", {
@@ -1372,9 +1532,7 @@ do
 end
 
 ----------------------------------------------------------------
--- NOVO - ABA: Efeitos (fogo azul/roxo/amarelo, brilho... + invisível)
--- Obs.: os efeitos são colocados no seu personagem; os outros jogadores
--- só os veem se o jogo replicar a mudança feita pelo cliente.
+-- Aba: Aparência (Efeitos + invisível)
 ----------------------------------------------------------------
 do
   local __ok, __err = pcall(function()
@@ -1448,7 +1606,6 @@ do
         })}
     end)
 
-    -- Fogo arco-íris: troca a cor continuamente
     connect(RunService.Heartbeat, function()
         if not active.Rainbow then return end
         local c = LP.Character
@@ -1460,14 +1617,12 @@ do
         end
     end)
 
-    -- Reaplicar efeitos ao renascer
     connect(LP.CharacterAdded, function(c)
         c:WaitForChild("HumanoidRootPart", 10)
         task.wait(0.5)
         for tag in pairs(active) do attach(tag) end
     end)
 
-    -- Modo invisível
     local invisOn = false
     local savedTransp = setmetatable({}, {__mode = "k"})
     local function applyInvis(on)
@@ -1514,7 +1669,7 @@ do
 end
 
 ----------------------------------------------------------------
--- NOVO: ESP avançado (nome, vida, distância, cor por time)
+-- ESP avançado (aba Visual)
 ----------------------------------------------------------------
 do
   local __ok, __err = pcall(function()
@@ -1569,7 +1724,6 @@ do
             local dist = (hrp and root) and (hrp.Position - root.Position).Magnitude or 0
             local inRange = S.esp and head ~= nil and hum ~= nil and dist <= opt.maxDist
 
-            -- destaque (Highlight do ESP original): respeita distância e cor por time
             local h = espFolder:FindFirstChild(p.Name)
             if h then
                 h.Enabled = inRange
@@ -1608,7 +1762,7 @@ do
 end
 
 ----------------------------------------------------------------
--- NOVO: Lista de jogadores clicável (aba Teleporte)
+-- Lista de jogadores clicável (aba Teleporte)
 ----------------------------------------------------------------
 do
   local __ok, __err = pcall(function()
@@ -1619,9 +1773,10 @@ do
     local rows = {}
 
     local holder = new("Frame", {Size = UDim2.new(1, 0, 0, 150), BackgroundColor3 = THEME.Panel, BorderSizePixel = 0}, t)
-    corner(holder, 8)
+    corner(holder, 10)
+    stroke(holder, Color3.new(1, 1, 1), 1, 0.93)
     local list = new("ScrollingFrame", {
-        Position = UDim2.fromOffset(4, 4), Size = UDim2.new(1, -8, 1, -8),
+        Position = UDim2.fromOffset(6, 6), Size = UDim2.new(1, -12, 1, -12),
         BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3,
         ScrollBarImageColor3 = THEME.Accent, CanvasSize = UDim2.new(),
         AutomaticCanvasSize = Enum.AutomaticSize.Y,
@@ -1647,14 +1802,14 @@ do
         if p == LP or rows[p] then return end
         local b = new("TextButton", {
             Name = p.DisplayName:lower() .. p.Name:lower(),
-            Size = UDim2.new(1, -6, 0, 28), BackgroundColor3 = THEME.Panel2,
+            Size = UDim2.new(1, -6, 0, 30), BackgroundColor3 = THEME.Panel2,
             Text = p.DisplayName .. "  (@" .. p.Name .. ")", TextColor3 = THEME.Text,
             Font = Enum.Font.GothamMedium, TextSize = 12, AutoButtonColor = false,
         }, list)
-        corner(b, 6)
+        corner(b, 8)
         b.MouseButton1Click:Connect(function()
             selected = p
-            viewBox.Text = p.Name -- já deixa o nick pronto no campo do "View"
+            viewBox.Text = p.Name
             paint()
         end)
         rows[p] = b
@@ -1711,7 +1866,7 @@ do
 end
 
 ----------------------------------------------------------------
--- NOVO - ABA: Discord
+-- Aba: Discord
 ----------------------------------------------------------------
 do
   local __ok, __err = pcall(function()
@@ -1720,10 +1875,11 @@ do
     local t = createTab("Discord")
     Section(t, "Servidor do Discord")
 
-    local row = new("Frame", {Size = UDim2.new(1, 0, 0, 60), BackgroundColor3 = THEME.Panel, BorderSizePixel = 0}, t)
-    corner(row, 8)
+    local row = new("Frame", {Size = UDim2.new(1, 0, 0, 70), BackgroundColor3 = THEME.Panel, BorderSizePixel = 0}, t)
+    corner(row, 10)
+    gradient(stroke(row, Color3.new(1, 1, 1), 1, 0.5), THEME.Accent, THEME.Accent2, 45)
     new("TextLabel", {
-        Position = UDim2.fromOffset(12, 0), Size = UDim2.new(1, -24, 1, 0), BackgroundTransparency = 1,
+        Position = UDim2.fromOffset(16, 0), Size = UDim2.new(1, -32, 1, 0), BackgroundTransparency = 1,
         Text = "Entre na nossa comunidade:\n" .. DISCORD_LINK, TextColor3 = THEME.Text,
         Font = Enum.Font.GothamMedium, TextSize = 13, TextWrapped = true,
         TextXAlignment = Enum.TextXAlignment.Left,
@@ -1738,7 +1894,7 @@ do
 end
 
 ----------------------------------------------------------------
--- NOVO: Campo de busca (aba "Buscar", primeira da barra lateral)
+-- Aba: Buscar (primeira da barra lateral)
 ----------------------------------------------------------------
 do
   local __ok, __err = pcall(function()
@@ -1788,7 +1944,7 @@ do
         return idx
     end
 
-    local box = TextInput(t, "Digite o nome da função...")
+    local box = TextInput(t, "🔍  Digite o nome da função...")
     local results = {}
 
     local function flash(row)
@@ -1842,11 +1998,11 @@ end
 -- Minimizar / restaurar / fechar
 ----------------------------------------------------------------
 local pill = new("TextButton", {
-    AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 14), Size = UDim2.fromOffset(0, 30),
+    AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 14), Size = UDim2.fromOffset(0, 34),
     BackgroundColor3 = THEME.Bg, Text = "", AutoButtonColor = false, Visible = false, ClipsDescendants = true,
 }, gui)
-corner(pill, 15)
-new("UIStroke", {Color = THEME.Accent, Thickness = 1, Transparency = 0.4}, pill)
+corner(pill, 17)
+gradient(stroke(pill, Color3.new(1, 1, 1), 1, 0.35), THEME.Accent, THEME.Accent2, 0)
 new("TextLabel", {
     Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "◈  " .. HUB_NAME,
     TextColor3 = THEME.Text, Font = Enum.Font.GothamBold, TextSize = 12,
@@ -1857,15 +2013,15 @@ local minimized = false
 local function setMinimized(v)
     minimized = v
     if v then
-        tween(main, 0.35, {Size = UDim2.fromOffset(0, 0)}, Enum.EasingStyle.Back, Enum.EasingDirection.In)
-        task.delay(0.35, function() if minimized then main.Visible = false end end)
+        tween(root, 0.35, {Size = UDim2.fromOffset(0, 0)}, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+        task.delay(0.35, function() if minimized then root.Visible = false end end)
         pill.Visible = true
-        tween(pill, 0.4, {Size = UDim2.fromOffset(230, 30)}, Enum.EasingStyle.Back)
+        tween(pill, 0.4, {Size = UDim2.fromOffset(250, 34)}, Enum.EasingStyle.Back)
     else
-        tween(pill, 0.25, {Size = UDim2.fromOffset(0, 30)})
+        tween(pill, 0.25, {Size = UDim2.fromOffset(0, 34)})
         task.delay(0.25, function() if not minimized then pill.Visible = false end end)
-        main.Visible = true
-        tween(main, 0.45, {Size = UDim2.fromOffset(WIDTH, HEIGHT)}, Enum.EasingStyle.Back)
+        root.Visible = true
+        tween(root, 0.45, {Size = UDim2.fromOffset(WIDTH, HEIGHT)}, Enum.EasingStyle.Back)
     end
 end
 btnMin.MouseButton1Click:Connect(function() setMinimized(true) end)
@@ -1874,9 +2030,8 @@ connect(UIS.InputBegan, function(i, gp)
     if not gp and i.KeyCode == Enum.KeyCode.RightControl then setMinimized(not minimized) end
 end)
 
--- (o corpo abaixo é o fechamento original; agora só roda depois da confirmação)
 local function doClose()
-    tween(main, 0.3, {Size = UDim2.fromOffset(0, 0)}, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+    tween(root, 0.3, {Size = UDim2.fromOffset(0, 0)}, Enum.EasingStyle.Back, Enum.EasingDirection.In)
     task.wait(0.32)
     for _, f in ipairs(cleanups) do pcall(f) end
     stopFly()
@@ -1885,98 +2040,121 @@ local function doClose()
     if h then h.WalkSpeed, h.JumpPower = 16, 50 workspace.CurrentCamera.CameraSubject = h end
     if S.fullbright then for k, val in pairs(origLight) do Lighting[k] = val end end
     for _, c in ipairs(connections) do c:Disconnect() end
+    clearBlur()
     gui:Destroy()
 end
 
--- NOVO: aviso de confirmação ao clicar no "X"
+-- Confirmação ao clicar no "X"
 local confirmOpen = false
 local function askClose()
     if confirmOpen then return end
     confirmOpen = true
 
-    local inv = 1 / uiScale.Scale
     local dim = new("TextButton", {
-        Size = UDim2.fromScale(inv, inv), BackgroundColor3 = Color3.new(0, 0, 0),
+        Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(0, 0, 0),
         BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 150,
     }, gui)
-    tween(dim, 0.25, {BackgroundTransparency = 0.45})
+    tween(dim, 0.25, {BackgroundTransparency = 0.5})
 
-    local box = new("Frame", {
-        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5 * inv, 0.5 * inv),
-        Size = UDim2.fromOffset(0, 0), BackgroundColor3 = THEME.Panel, BorderSizePixel = 0,
-        ClipsDescendants = true, ZIndex = 151,
+    local wrap = new("Frame", {
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1, ZIndex = 151,
     }, dim)
-    corner(box, 12)
-    new("UIStroke", {Color = THEME.Accent, Thickness = 1, Transparency = 0.4}, box)
+    shadow(wrap, 151)
+    local box = new("Frame", {
+        Size = UDim2.fromScale(1, 1), BackgroundColor3 = THEME.Panel, BorderSizePixel = 0,
+        ClipsDescendants = true, ZIndex = 152,
+    }, wrap)
+    corner(box, 14)
+    gradient(stroke(box, Color3.new(1, 1, 1), 1, 0.4), THEME.Accent, THEME.Accent2, 45)
 
+    local warnIcon = new("TextLabel", {
+        AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 14), Size = UDim2.fromOffset(34, 34),
+        BackgroundColor3 = THEME.Bad, BackgroundTransparency = 0.8, Text = "⏻", TextColor3 = THEME.Bad,
+        Font = Enum.Font.GothamBold, TextSize = 18,
+    }, box)
+    corner(warnIcon, 17)
     new("TextLabel", {
-        Position = UDim2.fromOffset(0, 16), Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1,
+        Position = UDim2.fromOffset(0, 54), Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1,
         Text = "Fechar o script?", TextColor3 = THEME.Text, Font = Enum.Font.GothamBold, TextSize = 16,
-        ZIndex = 152,
     }, box)
     new("TextLabel", {
-        Position = UDim2.fromOffset(10, 44), Size = UDim2.new(1, -20, 0, 36), BackgroundTransparency = 1,
+        Position = UDim2.fromOffset(14, 78), Size = UDim2.new(1, -28, 0, 34), BackgroundTransparency = 1,
         Text = "Todas as funções serão desativadas e o hub será removido.",
         TextColor3 = THEME.Sub, Font = Enum.Font.GothamMedium, TextSize = 12, TextWrapped = true,
-        ZIndex = 152,
     }, box)
 
     local function closeDialog()
-        tween(box, 0.2, {Size = UDim2.fromOffset(0, 0)}, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+        tween(wrap, 0.2, {Size = UDim2.fromOffset(0, 0)}, Enum.EasingStyle.Back, Enum.EasingDirection.In)
         tween(dim, 0.25, {BackgroundTransparency = 1})
         task.delay(0.28, function() dim:Destroy() confirmOpen = false end)
     end
 
     local function dialogButton(text, x, color, cb)
         local b = new("TextButton", {
-            AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(x, 0, 1, -14), Size = UDim2.fromOffset(110, 30),
+            AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(x, 0, 1, -14), Size = UDim2.fromOffset(120, 32),
             BackgroundColor3 = color, Text = text, TextColor3 = THEME.Text,
-            Font = Enum.Font.GothamBold, TextSize = 13, AutoButtonColor = false, ZIndex = 152,
+            Font = Enum.Font.GothamBold, TextSize = 13, AutoButtonColor = false,
         }, box)
-        corner(b, 8)
+        corner(b, 10)
         b.MouseEnter:Connect(function() tween(b, 0.15, {BackgroundTransparency = 0.2}) end)
         b.MouseLeave:Connect(function() tween(b, 0.15, {BackgroundTransparency = 0}) end)
         b.MouseButton1Click:Connect(cb)
     end
-    dialogButton("Não", 0.3, THEME.Panel2, closeDialog)
-    dialogButton("Sim, fechar", 0.7, Color3.fromRGB(220, 70, 80), function()
+    dialogButton("Não", 0.28, THEME.Panel3, closeDialog)
+    dialogButton("Sim, fechar", 0.72, THEME.Bad, function()
         dim:Destroy()
         confirmOpen = false
         doClose()
     end)
 
-    tween(box, 0.3, {Size = UDim2.fromOffset(300, 130)}, Enum.EasingStyle.Back)
+    tween(wrap, 0.3, {Size = UDim2.fromOffset(310, 176)}, Enum.EasingStyle.Back)
 end
 btnClose.MouseButton1Click:Connect(askClose)
 
 ----------------------------------------------------------------
--- NOVO: Tela de loading (rápida)
+-- Tela de loading
 ----------------------------------------------------------------
 do
-    local inv = 1 / uiScale.Scale
     local overlay = new("Frame", {
-        Size = UDim2.fromScale(inv, inv), BackgroundColor3 = THEME.Bg, BorderSizePixel = 0, ZIndex = 200,
+        Size = UDim2.fromScale(1, 1), BackgroundColor3 = THEME.Bg, BorderSizePixel = 0, ZIndex = 200,
     }, gui)
+    gradient(overlay, Color3.fromRGB(22, 17, 38), Color3.fromRGB(9, 9, 14), 90)
+
+    local logo = new("TextLabel", {
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.38), Size = UDim2.fromOffset(64, 64),
+        BackgroundColor3 = Color3.new(1, 1, 1), Text = "◈", TextColor3 = Color3.new(1, 1, 1),
+        Font = Enum.Font.GothamBold, TextSize = 36, ZIndex = 201,
+    }, overlay)
+    corner(logo, 18)
+    local logoGrad = gradient(logo, THEME.Accent, THEME.Accent2, 0)
+    tween(logoGrad, 1.6, {Rotation = 360}, Enum.EasingStyle.Linear)
 
     local title = new("TextLabel", {
-        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.44),
-        Size = UDim2.fromOffset(420, 30), BackgroundTransparency = 1, Text = HUB_NAME,
-        TextColor3 = THEME.Text, Font = Enum.Font.GothamBold, TextSize = 22, ZIndex = 201,
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.49),
+        Size = UDim2.fromOffset(420, 30), BackgroundTransparency = 1, Text = "Okkotsu Hub",
+        TextColor3 = THEME.Text, Font = Enum.Font.GothamBold, TextSize = 26, ZIndex = 201,
+    }, overlay)
+    local sub = new("TextLabel", {
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.535),
+        Size = UDim2.fromOffset(420, 18), BackgroundTransparency = 1, Text = "Universal Version",
+        TextColor3 = THEME.Accent, Font = Enum.Font.GothamMedium, TextSize = 13, ZIndex = 201,
     }, overlay)
     local status = new("TextLabel", {
-        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.52),
-        Size = UDim2.fromOffset(300, 20), BackgroundTransparency = 1, Text = "Carregando...",
-        TextColor3 = THEME.Sub, Font = Enum.Font.GothamMedium, TextSize = 13, ZIndex = 201,
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.6),
+        Size = UDim2.fromOffset(300, 18), BackgroundTransparency = 1, Text = "Carregando...",
+        TextColor3 = THEME.Sub, Font = Enum.Font.GothamMedium, TextSize = 12, ZIndex = 201,
     }, overlay)
     local barBg = new("Frame", {
-        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.58),
-        Size = UDim2.fromOffset(260, 6), BackgroundColor3 = THEME.Off, BorderSizePixel = 0, ZIndex = 201,
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.65),
+        Size = UDim2.fromOffset(280, 6), BackgroundColor3 = THEME.Off, BorderSizePixel = 0, ZIndex = 201,
     }, overlay)
     corner(barBg, 3)
     local barFill = new("Frame", {
-        Size = UDim2.fromScale(0, 1), BackgroundColor3 = THEME.Accent, BorderSizePixel = 0, ZIndex = 202,
+        Size = UDim2.fromScale(0, 1), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, ZIndex = 202,
     }, barBg)
     corner(barFill, 3)
+    gradient(barFill, THEME.Accent, THEME.Accent2, 0)
 
     local steps = {"Carregando módulos...", "Preparando interface...", "Aplicando tema...", "Pronto!"}
     for i, s in ipairs(steps) do
@@ -1985,12 +2163,13 @@ do
         task.wait(0.28)
     end
 
-    tween(overlay, 0.35, {BackgroundTransparency = 1})
-    tween(title, 0.35, {TextTransparency = 1})
-    tween(status, 0.35, {TextTransparency = 1})
+    clearBlur()
+    tween(overlay, 0.4, {BackgroundTransparency = 1})
+    for _, o in ipairs({title, sub, status, logo}) do tween(o, 0.35, {TextTransparency = 1}) end
+    tween(logo, 0.35, {BackgroundTransparency = 1})
     tween(barBg, 0.35, {BackgroundTransparency = 1})
     tween(barFill, 0.35, {BackgroundTransparency = 1})
-    task.wait(0.4)
+    task.wait(0.45)
     overlay:Destroy()
 end
 
@@ -1998,5 +2177,5 @@ end
 -- Animação de abertura
 ----------------------------------------------------------------
 selectTab("Jogador")
-tween(main, 0.55, {Size = UDim2.fromOffset(WIDTH, HEIGHT)}, Enum.EasingStyle.Back)
+tween(root, 0.55, {Size = UDim2.fromOffset(WIDTH, HEIGHT)}, Enum.EasingStyle.Back)
 task.delay(0.6, function() notify(HUB_NAME .. " carregado") end)
