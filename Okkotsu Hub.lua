@@ -130,7 +130,7 @@ do
     -- Jogadores com privilégio: entram sem key e sem prazo.
     -- Coloque o UserId (número da conta), um por linha, no formato:  [123456789] = true,
     local PRIVILEGED = {
-        -- [4427424158] = true,
+         [4427424158] = true,
     }
 
     local VALID_KEY  = "GLOBAL_866328948"
