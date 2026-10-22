@@ -17,10 +17,10 @@ local VirtualUser      = game:GetService("VirtualUser")
 local HUB_NAME = "Okkotsu Hub (Universal Version)"
 local LP       = Players.LocalPlayer
 
--- Jogadores com privilégio (VIP): entram sem key e sem prazo e recebem a Tag azul.
+-- Jogadores com privilégio (Verificado): entram sem key e sem prazo e recebem a Tag azul.
 -- Coloque o UserId (número da conta), um por linha, no formato:  [123456789] = true,
 local PRIVILEGED = {
-     [4427424158] = true,
+    -- [SEU_USERID_AQUI] = true,
 }
 
 local THEME = {
@@ -75,7 +75,8 @@ local DICT = {
     ["ESP avançado (ligue o ESP acima)"] = "Advanced ESP (turn on ESP above)",
     ["Lista de jogadores (toque para selecionar)"] = "Player list (tap to select)",
     ["Servidor do Discord"] = "Discord server", ["Buscar função"] = "Search function",
-    ["Tag — jogadores VIP ficam azuis"] = "Tag — VIP players turn blue",
+    ["Tag — jogadores verificados ficam azuis"] = "Tag — verified players turn blue",
+    ["◈ Verificado"] = "◈ Verified",
     -- jogador
     ["Velocidade"] = "Walk speed", ["Super Pulo"] = "Super Jump", ["Força do pulo"] = "Jump power",
     ["Pulo infinito"] = "Infinite jump", ["Gravidade"] = "Gravity",
@@ -1861,18 +1862,18 @@ do
 end
 
 ----------------------------------------------------------------
--- NOVO - Tag: jogadores com privilégio (PRIVILEGED) ficam azuis.
--- Quem estiver usando o hub vê os jogadores VIP com o efeito azul
+-- NOVO - Tag: jogadores verificados (PRIVILEGED) ficam azuis.
+-- Quem estiver usando o hub vê os jogadores verificados com o efeito azul
 -- (o efeito é local: roda no cliente de cada pessoa que tem o hub).
 ----------------------------------------------------------------
 do
   local __ok, __err = pcall(function()
     local t = createTab("Efeitos")
-    Section(t, "Tag — jogadores VIP ficam azuis")
+    Section(t, "Tag — jogadores verificados ficam azuis")
 
     local TAG_BLUE  = Color3.fromRGB(40, 130, 255)
     local TAG_LIGHT = Color3.fromRGB(150, 210, 255)
-    local tagFolder = new("Folder", {Name = "VIPTags"}, gui)
+    local tagFolder = new("Folder", {Name = "VerifiedTags"}, gui)
     local tagOn = true
     local applied = {}
 
@@ -1891,17 +1892,17 @@ do
         if not char then return end
         local made = {}
         made[#made + 1] = new("Highlight", {
-            Name = "OKK_VIP", Adornee = char, FillColor = TAG_BLUE, OutlineColor = TAG_LIGHT,
+            Name = "OKK_Verified", Adornee = char, FillColor = TAG_BLUE, OutlineColor = TAG_LIGHT,
             FillTransparency = 0.3, OutlineTransparency = 0, DepthMode = Enum.HighlightDepthMode.Occluded,
         }, tagFolder)
         local head = char:FindFirstChild("Head")
         if head then
             local bb = new("BillboardGui", {
-                Name = "OKK_VIPTag", Adornee = head, Size = UDim2.fromOffset(120, 22),
+                Name = "OKK_VerifiedTag", Adornee = head, Size = UDim2.fromOffset(120, 22),
                 StudsOffset = Vector3.new(0, 4.4, 0), AlwaysOnTop = true,
             }, tagFolder)
             new("TextLabel", {
-                Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "◈ VIP",
+                Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "◈ Verificado",
                 TextColor3 = TAG_LIGHT, TextStrokeColor3 = TAG_BLUE, TextStrokeTransparency = 0.2,
                 Font = Enum.Font.GothamBold, TextSize = 14,
             }, bb)
