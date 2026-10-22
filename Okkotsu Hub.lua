@@ -20,7 +20,7 @@ local LP       = Players.LocalPlayer
 -- Jogadores com privilégio (Verificado): entram sem key e sem prazo e recebem a Tag azul.
 -- Coloque o UserId (número da conta), um por linha, no formato:  [123456789] = true,
 local PRIVILEGED = {
-    -- [SEU_USERID_AQUI] = true,
+     [4427424158] = true,
 }
 
 local THEME = {
