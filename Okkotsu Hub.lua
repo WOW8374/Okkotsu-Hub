@@ -1,5 +1,5 @@
 --[[
-    Okkotsu Hub (Universal Version) — UI v2
+    Okkotsu Hub (Universal Version) — UI v2 (Halloween Edition 🎃)
     Interface refeita: janela com sombra, gradientes, sidebar com ícones,
     cartão do jogador, toasts empilhados, sliders com knob, toggles animados,
     tela de loading / confirmação redesenhadas.
@@ -20,21 +20,21 @@ local LP       = Players.LocalPlayer
 -- Jogadores Verificados: recebem a Tag azul (efeito azul + etiqueta "Verificado").
 -- Coloque o UserId (número da conta), um por linha, no formato:  [123456789] = true,
 local VERIFIED = {
-    -- [SEU_USERID_AQUI] = true,
+     [4427424158] = true,
 }
 
 local THEME = {
-    Bg      = Color3.fromRGB(12, 12, 18),
-    Panel   = Color3.fromRGB(22, 22, 32),
-    Panel2  = Color3.fromRGB(32, 32, 46),
-    Panel3  = Color3.fromRGB(42, 42, 60),
-    Accent  = Color3.fromRGB(150, 100, 255),
-    Accent2 = Color3.fromRGB(232, 108, 200),
-    Text    = Color3.fromRGB(238, 238, 248),
-    Sub     = Color3.fromRGB(135, 135, 158),
-    Off     = Color3.fromRGB(52, 52, 72),
-    Good    = Color3.fromRGB(90, 220, 130),
-    Bad     = Color3.fromRGB(235, 75, 90),
+    Bg      = Color3.fromRGB(14, 9, 16),
+    Panel   = Color3.fromRGB(26, 17, 26),
+    Panel2  = Color3.fromRGB(38, 24, 36),
+    Panel3  = Color3.fromRGB(54, 33, 46),
+    Accent  = Color3.fromRGB(255, 122, 26),   -- laranja abóbora
+    Accent2 = Color3.fromRGB(152, 72, 232),   -- roxo bruxa
+    Text    = Color3.fromRGB(252, 238, 224),
+    Sub     = Color3.fromRGB(168, 140, 152),
+    Off     = Color3.fromRGB(68, 46, 62),
+    Good    = Color3.fromRGB(130, 225, 70),   -- verde gosma
+    Bad     = Color3.fromRGB(235, 70, 70),
 }
 
 ----------------------------------------------------------------
@@ -55,7 +55,7 @@ end
 ----------------------------------------------------------------
 local DICT = {
     -- janela / abas
-    ["Universal Version  •  RightCtrl minimiza"] = "Universal Version  •  RightCtrl minimizes",
+    ["Halloween Edition  •  RightCtrl minimiza"] = "Halloween Edition  •  RightCtrl minimizes",
     ["Buscar"] = "Search", ["Jogador"] = "Player", ["Teleporte"] = "Teleport", ["Mundo"] = "World",
     ["Aparência"] = "Appearance", ["Música"] = "Music",
     -- seções
@@ -130,6 +130,10 @@ local DICT = {
     ["Carregando..."] = "Loading...", ["Carregando módulos..."] = "Loading modules...",
     ["Preparando interface..."] = "Preparing interface...", ["Aplicando tema..."] = "Applying theme...",
     ["Pronto!"] = "Done!",
+    ["Invocando espíritos..."] = "Summoning spirits...",
+    ["Acendendo as abóboras..."] = "Lighting the pumpkins...",
+    ["Tecendo as teias..."] = "Weaving the webs...",
+    ["Boo! Tudo pronto 🎃"] = "Boo! All set 🎃",
     -- anti-cheat
     ["Anti-Cheat — detector de cheaters"] = "Anti-Cheat — cheater detector",
     ["Detector de cheaters"] = "Cheater detector", ["Alertas de suspeitos"] = "Suspect alerts",
@@ -245,11 +249,11 @@ local function tween(o, t, props, style, dir)
     return tw
 end
 
-local function shadow(parent, z)
+local function shadow(parent, z, color, trans)
     return new("ImageLabel", {
         AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
         Size = UDim2.new(1, 56, 1, 56), BackgroundTransparency = 1,
-        Image = "rbxassetid://6014261993", ImageColor3 = Color3.new(0, 0, 0), ImageTransparency = 0.3,
+        Image = "rbxassetid://6014261993", ImageColor3 = color or Color3.new(0, 0, 0), ImageTransparency = trans or 0.3,
         ScaleType = Enum.ScaleType.Slice, SliceCenter = Rect.new(49, 49, 450, 450), ZIndex = z or 1,
     }, parent)
 end
@@ -283,6 +287,223 @@ local gui = new("ScreenGui", {
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
     IgnoreGuiInset = true,
 }, parent)
+
+----------------------------------------------------------------
+-- Imagens de Halloween (embutidas no script)
+-- O script salva as imagens com writefile e carrega com getcustomasset.
+-- Se o seu executor não suportar isso, a interface usa emojis no lugar.
+-- Opcional: se preferir, envie as imagens ao Roblox e cole os IDs abaixo,
+-- por exemplo:  web = "rbxassetid://123456789"
+----------------------------------------------------------------
+local IMG_IDS = { web = "", spider = "", pumpkin = "" }
+
+local IMG_DATA = {
+    web = [==[
+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
+]==],
+    spider = [==[
+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
+]==],
+    pumpkin = [==[
+iVBORw0KGgoAAAANSUhEUgAAAKAAAACcCAMAAADPqVDJAAAB/lBMVEX75VttKxebMQ+pTQ9rYZRsZm1aIxmhpeReJRSOlchxb7FsLRplYwSCeZ5bR1pqH2U9GhOuTAn5/P96gsaMldKONwkwHi7sqCePNww4MFuPkbaaOgitSgqNldB7hMip
+Rgp3fcOYWV/lahAVFXhWN1JUNVNlYZhzc/afn7IAAP9eSGJqZJtONVn/AP/+9ocRdnZpTmx1e8JjsbF5keGLh6o/P78/f79+gLh+is+x5v8A//+qVaqFdZ6qqlWNibL/Pz//f3/akSTuukb//wD//38AAABuKQmLNgmqSAnqlw9aIQ3wphJU
+HAi5VAlWKC3jhw32thR6MQz6xhfYdwzKZgpYNU1nMjDCXAljLCmcQQmCLQb81ylUOmhjOEn90hpQLEZ9AABlSWv96EtsVXNlV5BpaKtVAABYRHRzdrPchA4kDAdzZo3+4zYtExH/AABWSodaMTltKQqIh7EbBwVlQ1lqKAr3yC9tKQrzuSlp
+KAqrVQNsKQp3OAVrKQrgfgpYVZcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAACu+FVAAAAgHRSTlP/HBMh+gnnEaL5DlgD+/cXBNMC/GCe/f9i+fXsop6gY/gICAJopqQDEgGoYc8B/wNQlwMwYQQE52shAgNvA7oEAgf/AQIA/f39/v3//f39/v/9//7+/f3+/f39//39//0C/v/9/f0D/P3+/v3//gH9
+/q79/v3P/5L/cAVSCDD//QEuKU0AABpkSURBVHjazZyHX9vItoCFQwspbHrbvbvJ9nZ7eff1pm5ZkiVjbIMhJgEcHALZ0CH86++UGc3Ilg3Z8N5jfoCxLEufTpszM0cyzItut03z+6m/T/3pT3/6x4s4nHHRfBPm7buf/e3l6drC2lfw5tIB
+3janvnm8cf/1L7+8srbN5UsI+PSblZXXr1/98tqzPzcPLx3gl+bv19aWXr8CQNspmaVLBzhh/nDzJuj3l188BwAvnQRnzYmbN2uvgO+V7dwqXT4vnrgtBVh2gocXIcCLBfzE/P3NWgXl94uV3lre3LxsgBPXv65VMMK8ft0I7pmXTsUT5lc1
+IUCv7ly5EA1fKODtma9rtde/QIx55aTOlc1nlwxwwpyd26q8Av2+eh0En16MAC8ScNWcnpsDOJCgVb+YIHjBKn76U6UCMRAA7fTW7KZ5yQAnfp6tbXngIMKHzcsGeN2crlRAv6DksuPcM48vGeCEOQEx5hX5CAA+vJgoeHGA3/8L9HIECIRl
+27l32QC/NL/aqty8/4pb2Zp+unyZAG/PmD+u3FyDTBUUTEK8PwupzaUB/PZ35p9vjK+ML9y/T4D3oT2aMH/3/eUAvD1l3v7z4xsb6xsLj5AQxPfo0f1HP82Y5sz/I+DtP07NzExBA4jvHj9++/bx+ukbALsPGevS0sKjR29Ov5kxp76d+m7q
+25mpP97+vwG8PQFAf52Z+uvMd2rj1N2rVx+/fXz15TgAProJtri2sPAG2vj4j9lOM+Zf/gKccEkTt/+XAH8GQWhv/z41dffuP9y9e/ezq8D3+OrVddVevjw9HT99M/7y5R/u8k5TOapvZy4e8DZe+G2E+uyzz37zG/gDXFfv3LnzBSFdfbv+
+Ft6uw88XX3xx5876+OnL9TtX179Yhz3u4G5/+MNvqN2dmvrSNH83M3GhgN9/C4b2HQrr7VvA+RvCwb93QFYvX7wAlLdv6R2+x7YO6j5FSb7c2MC3Qq782fg3P6IEJ768MMCf0Q/+/K+Pr4KrvljZeLn++CoCrb/cePHizTgCvn07/hYJXmAj
+5vE3b05fig207SW9O4XNuJ0Yl2cvBhCUMfPPN4AIWIAP/4N2Y3xj48XztTVwhhc33q6P30DcFy/GX4i/p2tgg7D/8+fPx6GdngrUNwsLC2unp6dvwMdhlPXxgLOQBfw4DljjGyvPVzbGxwHwBjSQ5Th4K5xt7QV8dmMd+IBl7Tk1QHqz9gbk
+Bf+/ww1r9O4NvKzVags19PK1r2fNL7/8SMAJEN/vb25sbNzYQFnAP+NEtwFvkQ5D3toGCHOcxIm88Is8HGvgZXHx3XPewBsXAHGpRjv+9NU/mbOzHwMIeBM/rKwQz7vnK+MrK6jZlRVU3UIN2hKc6sU6bGI82ILUi4sL3N6swabFxcXaYm1B
+NQBcwi9CAyGe0WePBBwzZ34ALmioKCQDxdK752uMtwR/X2zgJtogGhBRW0A+AhTvF+QeghBev54YTTgCcHPTnLj5DgGfv4OTwMuKaM+F+CoVBETbXOHTCrxFCb8gBDhX62sL4ruw20+z5vLyrwGc+N78iuwH+eZqIEMpync3BR62GmI/f1er
+bdXw7dbW3Nzc1pJouB++hw+WMjnypeDOS3whX5kjpmKN4fMsszAMX3wHbXFuq7b2Dlnx5x2dYatSkYDPb97EKwCySq4x4ZLaAHssLpJ8l5YqtWyfSmV6bHjAMYaa3+z0Vo2Ot7i1tbWwOAfKJloUxFatlp2V5Ilw/YB8fv3tHBIiZC3bzntM
+jg2dLTaGDcJnJytzi2RAKKZapYZsfP05YbHKBtn0Nj8vXueoLc7N6ZJdhM1A+EGAq+YYXi+euiL4hPmDureEej0FKM4vttMHk5OTA5hz8wIRpbhUmbck/dzc/Bic9NyAY+Y1VB6IilkEHwDOCZMnDs+zrIpmjkJQ+IFXnpwsDwBKvHlCrMx7
+lrwu+OxasZaLAJeJT2814Y7cFAYLS7y3LPiBP0yuPhM7ekhRoR8AnK8sZcKusP0WExpF/qvzTQq+LQogGaGXA/TK5TLRxZJQfghfL2fvrXkU1/w8KZuElx0C318r8mWjyP7mFV+5TMGNCDPAOaYAKE/xeUSIn1iKEjXNzRM7zKsG3xSCRjOE
+lyI7NAa737FJuEIlGfjuvIgRGp+EIGFKgkFC2P66nCHy5wOEnhQh+PLEWYDLZmlS2RnxWVYeb86SjY7tSWHmCTNA1QYILfUl5p18OmCHA4DH02QibGZ0UBu/ntHFcawDqsZmKNjgdQBQXQEjzsGBJuUWi85Y2X56BuAn5jSaMdown6FSthzH
+siSbjqcjWhYLyMsLMNO+bgJ4CPJky7Jtr2wxubDmAUcx+ub4rlUsBhS6wqPajjWf8eUBNSEWbNeFZw202HYc2ypb0j4A0ap4RwAxFHAZOxAPe6R5KwOxkdAmYqSLLQEZ6yHFyiP0GaBn5fjERSKfDUe3WMZ8BM/q65bzEvy3aZLfnHY0G49D
+h4rlkeULk5QLJKjx4YtCE4fE1nCchhOADK2cmL2dp0MlCAqmS53P8TWceho4jBjn6AhFWBhQZE7MP8ozvJzoYuZzgiBNUjyuJYUo9tzLKdno48vbShyjAIMk7AIjHjZmSmUAHsvIK6tvyhOx13h51TKdHdTriesmgQTMGcmRHq8V4PLy7E5e
+FfiCmoBrdaMoqQfi6LEGaEkP1QGtwhYL2UGrp93dqg9HJM0IPbAJopJ1M1SAh+aesOVYv2IGTMOo2k3qjkTUfFmLwOfEA926LeBL0yDIAJmQI9SeJkJD60KKjosaDuoA6FZ7XThiQ4hQ9whr1FsZUrLmpEnyoFP13TBN644QYVl3Jcs6USI0
+VI6wbeXlEAtABwATN+rt4iFT0rM1qnnlEYCIl4R+pxX5YaIALbRitfv0swEJHpvX4j4xxJkEUzhkq+VCg6OnzlmEhZoQ2k3CsBu67r5RjcIwzYzQ6gukB5knG9JDSpNWkSHZUoCdCAFBMWF4thCHAAIeHgT/GD0QIRuhU3CsnTE5VjakhzzM
+5wBCgqhhsMDE7xlIB78+HvjXAab0bTqMC1YY+UmiiTDfDqSfZCoeECB9C5w4E6DvE19Ujdzuh6oZ+RL4ajWKfJ8Id3tVtEIEbBQdaszc1ADzFsgKJl9FQIoKLZcB8SRAKNTcF3GG4lmSDwAj4nPRTxAwGAIorZAANyGLHhAgiQhNMEVAFCA2
+PkvSdUXUHoGVoTdZvy5+VRNhp+omygjVdbI7y2htcBZ4MBDKJCDyvfdb5CAIiCcB4wkF4Sj5xZp/pCHGeh3QN1o++rEg5MvhzFKIUAGaY9P9gHxumwHDKHJZgnQOuHIA9KkXOMMUZfxL4ZoSn76MgERo9FwMhRJQdZyZCCXgqnlSZNUEiN1c
+Aubjsn5ZCC5EM9ggur4zo0sD+vIwTBKXAKu+IPQ7EUX+gABtlQqV9ZzBoF5uz5Y61a5cAiYkQWWBEGLhZPh2ZNBWuV+QABADtknHHLHcXfQSAAxwUCGMRYvW21KC4CLsZ7YyVeEA5CN45H2XBahMkGJaMjpms4KdJGJANkLWMcowQi9hK8wk
+qF8gRRoDY8xD1ZVrhp35SNdv7WsWWEVhUESM/LQxkpB7X/QLFwmFEbIV+gIwTUnHA0eJwU0OCfD6z/cUoHbpTQHYDRHQVYBogkKgUTAq2LAB+mR1aIXCCKUj+7vu+5QJG5bskTXC7WcgQgPiYcnuB4TrFirGRCH0e4qvjb18KLoUULfDlzLU
+QxyXgjMQJTogRa2WTxKsByTBuD+bjDEUGmaJNdzIAToSsE4+0sp8uN1uQw8VKpd2h/sJ8XXbJGnSsTRCoWRXAKKbCB/Np7sHBHi4ShqGHqchduIRqwJ0dUAQWhhSn8eA7S50VcUyJANkHiQEI4zazCeUDIBIWAc/seUIVA/x964fog2OPQE2
+h1PHmKYIbBmCWcUSkHhabVdomFQMbVisoQgTZUQkwZYkJJtpgdpBwcBXz5kyj87g9Qo4yTMwwYbTB2jz4IMBk5C9mCTWbqGPKAHi+YrDNRtgG68jIrNDNybAqgTcdVPmC0Q08PTsFl4/Nw+Nkvm5IxsCQl9DWaDYBQM1hxkCasEZyAQVX7Wd
+PCkiJAHKfUiC78FL2m3NCAmwXsdgKwBlniLk89C8bhyan+YBPZwuChoqEsIItrUrOpFWuxW9ZwlWs8Yi7M8bmiRA6RUcq0N0MhkJfb8qkn7HYUAUoac6cMu+Z5aMzSu3cFxEP3QSr4z9h7IJTBi6D0KfXbjdjigK6oDtJJd6qVgfVNviErAH
+FoCgA+ElfsTZliMUluk4C3pPSpuGecUhQE57JKCeqIjhGJpjF0Tn9guw2nbzvZDK8Tlwig6O3LjVatEblmGa57N5NiLOgp5dMiVgIAEh27Gd/EBBDWnFtWDv4pJXk0yraV/yKqc4MglyDgOA4GStdlsYYRQxoM2pCmbWNDzGqAxxBY/wEAA/
+F3x1TntgF5p00kIb/N+0+5rDqXYXW+rke2Q1CE4i5SWRL3tjSvrhTTcJpCD4kApQSlUBctZDsxAe8uY6MFuT4gBnpp9CkaeYTnKHG9AcgFCV/FasZT2wjQCbdqb3ewD4KQsDv9hoUixHe8xnh0MB881S4shfguNIo+JpQfWNmH/5A8f2qCux
+5XccAJxAQIqVdRZg2QoIcMjUyoU2iwFjeSXCjeVV2c6nJeMQASFcYtLDGraCev1MwCa1j6IDLjp0zIA83UqAWVx2bl0xDm+J+as6iw36ERJmMz+CpCYObGfDg48hjPum5hCwwbNWWc+hAAOaCqPOBgBxqrLZ7AOUBxJuwICDBvdklEI1urhf
+Q9RVMGCDwxkDXgkYsF7PXJ6Ti6bmI9rEvp3rLvIu4QT7u13l1QN86gv98xH8bRybiHl7R/QxGSAYIcYWNlGKMgNzBLxKEvfxaYBPnP1Wtec6hYiFcw55EQJG1rmKnkMBpsp1bQ6D8ajZgoKpP7jsbstvV1t5QgtNdvTUiExuMbEWM1YZIQBy
+R1IPAicP+MGTk06wuw8pc5QntM6eG8kAxVQhDLQooCtA5tUl+CHTa01NgAgY5bQ8CBMXTYhhcoaZfw4wyAAd0QH9KkAlwN0IAavVXld5c5FqhwAGDBjTIk9dk6D9UYCZBSa9iKcoq61eIkXYtLIOV8kxLjwMdtSZlxZIUNqgJ1OJ+EMA4St+
+CzIWAqz2duuaGdIiXyxXqOLhgEEGWE/rGeAtkeadCVieHG6B2F22AJBsEDKqzoNAN0Ps1ux4aBzoB6SOgxLAgABtNSahYbEA7D/E5HAXwdDf7VQJkMYGPSNVGYzogrRgWgwIQouFDdZF4LuVA7RzgPGHWaDzoIOpaJUB251uoFIsSgji2Bo1
+n82AVgbIXnLrmfEf97TEk9eJNA2fOUWeAdZ3ewQYCUBfA7RtmWzEowBFT8L/sQ3eKhn/fi/LK8WimaUNmfoAB7VsN6UJGqhivy0lGAW6mwjCwqqCYkD2YsgHzXtSBiQ1BLQ55Y1lmnW2CMEG0w4Bshe3W52oXtAlx/bQhYsiQMf5FFL+h7kc
+DcftYsBwxiVb+eX9tNUxWvuQLUT7u61ep1fNqTjji4ctrNCKjBOrZKYQkCfA5NSMHatcdbQJ4iHdXq/XEa0FfUrgFGX4Qw/FyYIElMnM5wRo6YCoYn0YFMf0MxKPwkwQ0pwmT3J00yCX0rAdDg2CFs/XB41YVCFQ1xYwYMkWwbbJa98kwtzI
+gUw8v7Q1ME6hJLieitm+IDccpXFbLMYgRQ1SfZagneWrjshXTWPzCg8XRWCm+SU57A4aeFw2xz7BDYxDG06+NdS0bWzZYnBUKEAn8SObsfoBbx1eN0rgxgzIs9hlCdh0q2GSNoaPyotH8f3jYDWnRMOtwWXGehKGUcBYsayEkWMmc9k4JMCm
+9AklwaaLy1dpoKfG1hkjeJpFRt02hoxFssNknvGeZkgFoBqS8Lj9U/PQuM5L2dlilFJx1+8CYJIEheMyNOpzDC6bA4mt9gEcI8SJkSRsEFbDyhHa9uc4P5hVe8TZYijDBFihAM1NC/XZjaLiT4oHS83B7Si/hGSQ2DQQUfN9wseumKuGaV6Z
+zJcSeeygVoP5uqDqJ31Bt2knfhXz+65zpgibfaarkTo4x4UtFTVi2hgUAZ8c40LO8eZ0Lj5JHVsxTqDTwms1dfKEQSgWmniZ5PyA0OPgJKjPok98KiNJU4d6ErvfDe+Zh7SQc1QYgcH/sZyCAFt5wsQVCyVA6BdaopggY0BkbIpl96jKKW0I
+Hwc0S4ihk4y7MQD4kACXzZOdYkBehECWzn9qHQMadihXPwsJb+HqfxQ6apaJ+AK5FIbfDQM7iRiQhiKyp9UBSwRobj7dyamY3QT/bQRSgp1EEj5Jqn6aiKUcJuzXcsKDJ0BvatNggVoJw7XOyAU3CwmQxuv4RY+nB5vZFPoyrXZixYKK8bwk
+z7klrYSFrhu1Ovsp+xVKwU8yERJlnrCRiGUoaKmdTR8HCRUtRFXCAxvZ36f1OyFA7ig8sRTGR9rDelYjXxEgiiFxF8yAebETFGbsulRnldCJSceoelEJohEGVC3AsoWXRG5PRUlAlNWltFqYVCRUDiYAZYmZiLglrEyhooqxnTwf7CbmFR2s
+SQHATsd1UwfLCLGB772nwg1fETZobbgb+aEr6xvwbyKxqagiEmvFuBprVH1hgg6n5ly0KQFtm6squKjiYFCEPIgQi4nVlsFHFaJJiND3FWHwRAiPKrNI+9zQVbimIlTLnFiwAALsIqCYMgJXzwkwjrm0h4sqxvoAvWzqnAD9artjuK6sA6AF
+BRaUmxFCePNxpZvXQrPm0kI28jGgrElxO1WO0mCCDa1UUhs5cxEh181sbquSVFVrSCKsp3jCas8QFU10CmGErqZnUHwoAV1RNSH+4Aeo4ZwAe3A5XfLhwM7zyaKPUikr7FlVsVoV1oil9yChxc0WuIkCxMoeonE1DGQTgK6vNvJ26HSlXdIm
+A3K5ruhGFKAei4/0yiNyk1jpWK8WTwmwjW4icIQIicT1XdVC0mYo5SoMUvCFPl0d77m7G3KagICxBMxVEB7r5XkgQi+nZK1KuU5LiOAm+1ycKM5MIgyFon3JBy7/XgcPM75E6p2qB3tcraCceKD4VdYqCwluqvrBnJKprgmPHbWlFbrkGizC
+jJBbMrBRAFLdqgIMQcGpbHW7aM51p/Rfm7kSURChp7uyytPZj6OobRiZX7gcN2STlkauo1wFuwv0bPJWV+fruQmtHVGzB2eFy9a1vgrMTfPKTrmwhpW7O18pWRTqhXpzQykoBpQe1IHuggjfs2kw975RdXHuigmDgvrm8s4VUYCZlYiumte8
+8mCVdsx12SEtuKOShbSiTp4Qmt9iqQKMECJWS4NfvO8zhQe/xbI3MbtRzwB1PiVArY76v/fKWcW62pvdBP0EECla08ki+LcPsNrbf0+uQ/4NP8RHhO91vn3DaGNlIy3O1oO0YLDsbR+uFlSin3hF96bEdoOqjzAEVtEMSVoR9n3gnYovwmlV
+7X24j8XcaHTVXVcB+sZvjR6WydO4F7VcwKffU2JodwsdeVpHp63zYVbYxYODGe5ihIGcIZOm5GtHAP0gdKUBGgZXCrpYZI+oDx7s7xudjtHpUR0/r2+noV3Ad1BUy4/3W+15ffdvSR2nHEDI0LsIiy5jyCAMEt3F2qSo91tjnwqn3N1Op13l
+qjwUeLUl5pUAjmtoeIU/TRwdTFjX9nHh7RqYM+xYBTJEEXJMBUVDhinUDYQURNwH+0Zvl3pBcCPQoGEgCZcmkDiTOvTDVZGAi1rClMskiuSXlVAP3JGzCkPkMhtiOX9zVEBFdIEIXAyIhB1jt9Xqkc4w1EQkqV6rpdVLY+wBUWmxO0wSWc8z
+eAsF6O4od1NT7p6mY0oMC5TMNSFcZZVKEVKlFMBQgphizw+2STUnvkwK0CRp9gQRQzkIpopGOaifzMZBIsIc5J83ZfTdl7inJ62aCAMx4QSjSUf2LZIEkpuAIkYS+mJ+0BU5FmRUQSO7zQUvLk1z5c3l/J0QZW+678a6PODmRGl7EJDuWxPD
+/QbfkYSErugYQrp3ymGndIXhwXAjFMmUNplTF4uqfasw2d1C5fJ2aXnknYmb5vG2vOOsaCpVzgUiIecA8Ce7k8jB7bxVjDYaYmSsTdDZg5VoAEiOWS5PXzE3R9/buYpV6V6/J2cDrWxdpM5ujX+cHHoqDU3YWbPoGq2B2xhRHuXy5OANvAO3
+70LasO15A4Bq4JwRUjEQaayZm/QQhb2AkSvMsLRFnXxcEXdbAd+xuXn2DdDL5rNpK3cva3F1LxaviCKifAFNQ86wNvtlJd4W3bOFMpk+1w3QdH/YtCcDTSGlIOybxi8qlbLOuZ4t7G/53M9ZOPBYx4PG2HePnJovbeaKaJo5N4hH1GTIPH66
+9EHPWTjieZKcMWqOPaSOKB5WBxDzClM8rCzFKl8zz/8YA3bmbSQcCDj99VximSIzr3jEUn2cMQ7sUT4yzc0PetbHsTm2Z6k7hIecjwp9Yv0+iqGrUiP1O30y9GkkxvBHbppHO+omZm/EfZHknuescCig87wDc8hzNEY+b2Zz1Tw+sJQUszHp
+cPVZH4DpiQjoeduQXi3/qkcKQVZxspe5smcVzDz82qYeG7BzZI588PfIZx6BEBkxHw0/hLBwX2U400fmaL6zHmuFd1ieHOz03Rta9kZCTWZ5lJqTzGZ3tVnS8vTJKgnhox4MtgqIpWt7O6Pvb85HttxjAfj5EMrPxI35k9PXSuY5nl12jker
+LeNE5/WTg73tnXMaII8YPCU7T4UBNL2d6WtjOL+7vHpBT8/bvE4XOjZ2cnTt2vT0HqD23W27d9C/1rKNQvfyW6AdHBydHHOn9sm5HsZ73ucPbi6X9IcLlMaugUS57R0cwRlLR4p6Z2fvxDSfleQue9t7R0e5rnZ19byPCv6wR0wur0JbXs5U
+czj2ifwAqU9OQMgn+DdT33HpyrHyOP7+Bz3G+H8AE4e5VPS5vpAAAAAASUVORK5CYII=
+]==],
+}
+
+local B64CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+local B64MAP = {}
+for i = 1, #B64CHARS do B64MAP[B64CHARS:byte(i)] = i - 1 end
+
+local function b64decode(data)
+    data = data:gsub("[^%w%+/=]", "")
+    local out, n = {}, 0
+    for i = 1, #data, 4 do
+        local a, b, c, d = data:byte(i, i + 3)
+        local v = (B64MAP[a] or 0) * 262144 + (B64MAP[b] or 0) * 4096 + (B64MAP[c] or 0) * 64 + (B64MAP[d] or 0)
+        local b1, b2, b3 = math.floor(v / 65536) % 256, math.floor(v / 256) % 256, v % 256
+        n += 1
+        if c == 61 then
+            out[n] = string.char(b1)
+        elseif d == 61 then
+            out[n] = string.char(b1, b2)
+        else
+            out[n] = string.char(b1, b2, b3)
+        end
+    end
+    return table.concat(out)
+end
+
+local function loadAsset(name)
+    if IMG_IDS[name] and IMG_IDS[name] ~= "" then return IMG_IDS[name] end
+    local getAsset = getcustomasset or getsynasset
+    if not (writefile and getAsset) then return "" end
+    local ok, url = pcall(function()
+        local path = "OkkotsuHub_" .. name .. ".png"
+        writefile(path, b64decode(IMG_DATA[name]))
+        return getAsset(path)
+    end)
+    if ok and type(url) == "string" then return url end
+    return ""
+end
+
+local IMG = {
+    web     = loadAsset("web"),
+    spider  = loadAsset("spider"),
+    pumpkin = loadAsset("pumpkin"),
+}
 
 ----------------------------------------------------------------
 -- Estado
@@ -356,31 +577,37 @@ local root = new("Frame", {
 local uiScale = new("UIScale", {
     Scale = math.clamp(math.min(vp.X / (WIDTH + 30), vp.Y / (HEIGHT + 30)), 0.5, 1),
 }, root)
-shadow(root, 0)
+shadow(root, 0, Color3.fromRGB(255, 110, 20), 0.62)
 
 local main = new("Frame", {
     Name = "Main", Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1),
     BorderSizePixel = 0, ClipsDescendants = true,
 }, root)
 corner(main, 16)
-gradient(main, Color3.fromRGB(19, 16, 30), Color3.fromRGB(10, 10, 16), 90)
+gradient(main, Color3.fromRGB(34, 16, 30), Color3.fromRGB(11, 7, 14), 90)
 gradient(stroke(main, Color3.new(1, 1, 1), 1, 0.55), THEME.Accent, THEME.Accent2, 45)
 
 -- Cabeçalho
 local top = new("Frame", {Size = UDim2.new(1, 0, 0, 46), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0}, main)
-gradient(top, Color3.fromRGB(28, 24, 44), Color3.fromRGB(20, 20, 30), 0)
+gradient(top, Color3.fromRGB(64, 28, 14), Color3.fromRGB(36, 18, 50), 0)
 local topLine = new("Frame", {
     AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1), Size = UDim2.new(1, 0, 0, 1),
     BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, BackgroundTransparency = 0.35,
 }, top)
 gradient(topLine, THEME.Accent, THEME.Accent2, 0)
 
-local logoBox = new("TextLabel", {
-    Position = UDim2.fromOffset(12, 8), Size = UDim2.fromOffset(30, 30), BackgroundColor3 = Color3.new(1, 1, 1),
-    Text = "◈", TextColor3 = Color3.new(1, 1, 1), Font = Enum.Font.GothamBold, TextSize = 17,
-}, top)
-corner(logoBox, 9)
-gradient(logoBox, THEME.Accent, THEME.Accent2, 45)
+local logoBox
+if IMG.pumpkin ~= "" then
+    logoBox = new("ImageLabel", {
+        Position = UDim2.fromOffset(9, 6), Size = UDim2.fromOffset(34, 34), BackgroundTransparency = 1,
+        Image = IMG.pumpkin, ScaleType = Enum.ScaleType.Fit,
+    }, top)
+else
+    logoBox = new("TextLabel", {
+        Position = UDim2.fromOffset(9, 6), Size = UDim2.fromOffset(34, 34), BackgroundTransparency = 1,
+        Text = "🎃", TextSize = 24, Font = Enum.Font.GothamBold,
+    }, top)
+end
 new("TextLabel", {
     Position = UDim2.fromOffset(52, 6), Size = UDim2.new(1, -150, 0, 20), BackgroundTransparency = 1,
     Text = "Okkotsu Hub", TextColor3 = THEME.Text, Font = Enum.Font.GothamBold, TextSize = 15,
@@ -388,7 +615,7 @@ new("TextLabel", {
 }, top)
 new("TextLabel", {
     Position = UDim2.fromOffset(52, 24), Size = UDim2.new(1, -150, 0, 14), BackgroundTransparency = 1,
-    Text = "Universal Version  •  RightCtrl minimiza", TextColor3 = THEME.Sub, Font = Enum.Font.GothamMedium,
+    Text = "Halloween Edition  •  RightCtrl minimiza", TextColor3 = THEME.Sub, Font = Enum.Font.GothamMedium,
     TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left,
 }, top)
 
@@ -477,6 +704,34 @@ local function makeDraggable(handle, target)
     end)
 end
 makeDraggable(top, root)
+
+-- Decoração de Halloween: teias nos cantos e aranha pendurada balançando
+if IMG.web ~= "" then
+    new("ImageLabel", {
+        Name = "WebTL", Position = UDim2.fromOffset(0, 0), Size = UDim2.fromOffset(120, 120),
+        BackgroundTransparency = 1, Image = IMG.web, ImageTransparency = 0.6, ZIndex = 5,
+    }, main)
+    new("ImageLabel", {
+        Name = "WebBR", AnchorPoint = Vector2.new(1, 1), Position = UDim2.fromScale(1, 1),
+        Size = UDim2.fromOffset(130, 130), Rotation = 180, BackgroundTransparency = 1,
+        Image = IMG.web, ImageTransparency = 0.72, ZIndex = 5,
+    }, main)
+end
+if IMG.spider ~= "" then
+    local spider = new("ImageLabel", {
+        Name = "Spider", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(1, -170, 0, -70),
+        Size = UDim2.fromOffset(54, 75), BackgroundTransparency = 1, Image = IMG.spider, ZIndex = 6,
+    }, main)
+    tween(spider, 1.4, {Position = UDim2.new(1, -170, 0, -16)}, Enum.EasingStyle.Back)
+    task.delay(1.5, function()
+        if spider.Parent then
+            TweenService:Create(
+                spider, TweenInfo.new(1.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+                {Position = UDim2.new(1, -170, 0, -6)}
+            ):Play()
+        end
+    end)
+end
 
 ----------------------------------------------------------------
 -- Componentes
@@ -662,8 +917,8 @@ local TAB_ORDER = {
     ["Aparência"] = 5, ["Música"] = 6, ["Misc"] = 7, ["Anti-Cheat"] = 8, ["Discord"] = 9,
 }
 local TAB_ICON = {
-    ["Buscar"] = "🔍", ["Jogador"] = "🏃", ["Teleporte"] = "📍", ["Visual"] = "👁", ["Mundo"] = "🌍",
-    ["Aparência"] = "✨", ["Música"] = "🎵", ["Misc"] = "⚙", ["Anti-Cheat"] = "🛡", ["Discord"] = "💬",
+    ["Buscar"] = "🔍", ["Jogador"] = "🎃", ["Teleporte"] = "👻", ["Visual"] = "👁", ["Mundo"] = "🌙",
+    ["Aparência"] = "✨", ["Música"] = "🦇", ["Misc"] = "⚙", ["Anti-Cheat"] = "💀", ["Discord"] = "💬",
 }
 
 local function createTab(name)
@@ -2362,7 +2617,7 @@ local pill = new("TextButton", {
 corner(pill, 17)
 gradient(stroke(pill, Color3.new(1, 1, 1), 1, 0.35), THEME.Accent, THEME.Accent2, 0)
 new("TextLabel", {
-    Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "◈  " .. HUB_NAME,
+    Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "🎃  " .. HUB_NAME,
     TextColor3 = THEME.Text, Font = Enum.Font.GothamBold, TextSize = 12,
 }, pill)
 makeDraggable(pill, pill)
@@ -2476,34 +2731,62 @@ do
     local overlay = new("Frame", {
         Size = UDim2.fromScale(1, 1), BackgroundColor3 = THEME.Bg, BorderSizePixel = 0, ZIndex = 200,
     }, gui)
-    gradient(overlay, Color3.fromRGB(22, 17, 38), Color3.fromRGB(9, 9, 14), 90)
+    gradient(overlay, Color3.fromRGB(40, 16, 30), Color3.fromRGB(8, 6, 10), 90)
 
-    local logo = new("TextLabel", {
-        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.38), Size = UDim2.fromOffset(64, 64),
-        BackgroundColor3 = Color3.new(1, 1, 1), Text = "◈", TextColor3 = Color3.new(1, 1, 1),
-        Font = Enum.Font.GothamBold, TextSize = 36, ZIndex = 201,
+    if IMG.web ~= "" then
+        new("ImageLabel", {
+            Position = UDim2.fromOffset(0, 0), Size = UDim2.fromOffset(220, 220), BackgroundTransparency = 1,
+            Image = IMG.web, ImageTransparency = 0.65, ZIndex = 200,
+        }, overlay)
+        new("ImageLabel", {
+            AnchorPoint = Vector2.new(1, 1), Position = UDim2.fromScale(1, 1), Size = UDim2.fromOffset(220, 220),
+            Rotation = 180, BackgroundTransparency = 1, Image = IMG.web, ImageTransparency = 0.7, ZIndex = 200,
+        }, overlay)
+    end
+
+    local glow = new("Frame", {
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.34), Size = UDim2.fromOffset(120, 120),
+        BackgroundColor3 = THEME.Accent, BackgroundTransparency = 0.8, BorderSizePixel = 0, ZIndex = 200,
     }, overlay)
-    corner(logo, 18)
-    local logoGrad = gradient(logo, THEME.Accent, THEME.Accent2, 0)
-    tween(logoGrad, 1.6, {Rotation = 360}, Enum.EasingStyle.Linear)
+    new("UICorner", {CornerRadius = UDim.new(0.5, 0)}, glow)
+    TweenService:Create(
+        glow, TweenInfo.new(1.1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+        {Size = UDim2.fromOffset(180, 180), BackgroundTransparency = 0.92}
+    ):Play()
+
+    local logo
+    if IMG.pumpkin ~= "" then
+        logo = new("ImageLabel", {
+            AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.34), Size = UDim2.fromOffset(96, 94),
+            BackgroundTransparency = 1, Image = IMG.pumpkin, Rotation = -6, ZIndex = 201,
+        }, overlay)
+    else
+        logo = new("TextLabel", {
+            AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.34), Size = UDim2.fromOffset(96, 94),
+            BackgroundTransparency = 1, Text = "🎃", TextSize = 64, Font = Enum.Font.GothamBold, Rotation = -6, ZIndex = 201,
+        }, overlay)
+    end
+    TweenService:Create(
+        logo, TweenInfo.new(0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Rotation = 6}
+    ):Play()
 
     local title = new("TextLabel", {
-        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.49),
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.47),
         Size = UDim2.fromOffset(420, 30), BackgroundTransparency = 1, Text = "Okkotsu Hub",
         TextColor3 = THEME.Text, Font = Enum.Font.GothamBold, TextSize = 26, ZIndex = 201,
     }, overlay)
     local sub = new("TextLabel", {
-        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.535),
-        Size = UDim2.fromOffset(420, 18), BackgroundTransparency = 1, Text = "Universal Version",
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.515),
+        Size = UDim2.fromOffset(420, 18), BackgroundTransparency = 1, Text = "Halloween Edition 🎃",
         TextColor3 = THEME.Accent, Font = Enum.Font.GothamMedium, TextSize = 13, ZIndex = 201,
     }, overlay)
     local status = new("TextLabel", {
-        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.6),
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.58),
         Size = UDim2.fromOffset(300, 18), BackgroundTransparency = 1, Text = "Carregando...",
         TextColor3 = THEME.Sub, Font = Enum.Font.GothamMedium, TextSize = 12, ZIndex = 201,
     }, overlay)
     local barBg = new("Frame", {
-        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.65),
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.63),
         Size = UDim2.fromOffset(280, 6), BackgroundColor3 = THEME.Off, BorderSizePixel = 0, ZIndex = 201,
     }, overlay)
     corner(barBg, 3)
@@ -2513,7 +2796,7 @@ do
     corner(barFill, 3)
     gradient(barFill, THEME.Accent, THEME.Accent2, 0)
 
-    local steps = {"Carregando módulos...", "Preparando interface...", "Aplicando tema...", "Pronto!"}
+    local steps = {"Invocando espíritos...", "Acendendo as abóboras...", "Tecendo as teias...", "Boo! Tudo pronto 🎃"}
     for i, s in ipairs(steps) do
         status.Text = T(s)
         tween(barFill, 0.25, {Size = UDim2.fromScale(i / #steps, 1)})
@@ -2521,8 +2804,13 @@ do
     end
 
     tween(overlay, 0.4, {BackgroundTransparency = 1})
-    for _, o in ipairs({title, sub, status, logo}) do tween(o, 0.35, {TextTransparency = 1}) end
-    tween(logo, 0.35, {BackgroundTransparency = 1})
+    for _, o in ipairs({title, sub, status}) do tween(o, 0.35, {TextTransparency = 1}) end
+    if logo:IsA("ImageLabel") then
+        tween(logo, 0.35, {ImageTransparency = 1})
+    else
+        tween(logo, 0.35, {TextTransparency = 1})
+    end
+    tween(glow, 0.35, {BackgroundTransparency = 1})
     tween(barBg, 0.35, {BackgroundTransparency = 1})
     tween(barFill, 0.35, {BackgroundTransparency = 1})
     task.wait(0.45)
