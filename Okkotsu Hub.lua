@@ -2,7 +2,7 @@
     Okkotsu Hub (Universal Version) — UI v2
     Interface refeita: janela com sombra, gradientes, sidebar com ícones,
     cartão do jogador, toasts empilhados, sliders com knob, toggles animados,
-    tela de key / loading / confirmação redesenhadas.
+    tela de loading / confirmação redesenhadas.
     Atalho: RightControl = minimizar / restaurar
 ]]
 
@@ -17,10 +17,10 @@ local VirtualUser      = game:GetService("VirtualUser")
 local HUB_NAME = "Okkotsu Hub (Universal Version)"
 local LP       = Players.LocalPlayer
 
--- Jogadores com privilégio (Verificado): entram sem key e sem prazo e recebem a Tag azul.
+-- Jogadores Verificados: recebem a Tag azul (efeito azul + etiqueta "Verificado").
 -- Coloque o UserId (número da conta), um por linha, no formato:  [123456789] = true,
-local PRIVILEGED = {
-     [4427424158] = true,
+local VERIFIED = {
+    -- [SEU_USERID_AQUI] = true,
 }
 
 local THEME = {
@@ -54,17 +54,6 @@ end
 -- trocar o idioma, sem precisar recarregar o hub).
 ----------------------------------------------------------------
 local DICT = {
-    -- key
-    ["Universal Version  •  Verificação de key"] = "Universal Version  •  Key verification",
-    ["Digite sua key para continuar"] = "Enter your key to continue",
-    ["🔑  Cole sua key aqui"] = "🔑  Paste your key here",
-    ["Validar"] = "Validate",
-    ["Cancelar"] = "Cancel",
-    ["💬  Pegar a key no Discord (copiar link)"] = "💬  Get the key on Discord (copy link)",
-    ["Link copiado! A key está no chat do Discord"] = "Link copied! The key is in the Discord chat",
-    ["Esta key expirou."] = "This key has expired.",
-    ["Key válida!"] = "Valid key!",
-    ["Key inválida"] = "Invalid key",
     -- janela / abas
     ["Universal Version  •  RightCtrl minimiza"] = "Universal Version  •  RightCtrl minimizes",
     ["Buscar"] = "Search", ["Jogador"] = "Player", ["Teleporte"] = "Teleport", ["Mundo"] = "World",
@@ -141,6 +130,18 @@ local DICT = {
     ["Carregando..."] = "Loading...", ["Carregando módulos..."] = "Loading modules...",
     ["Preparando interface..."] = "Preparing interface...", ["Aplicando tema..."] = "Applying theme...",
     ["Pronto!"] = "Done!",
+    -- anti-cheat
+    ["Anti-Cheat — detector de cheaters"] = "Anti-Cheat — cheater detector",
+    ["Detector de cheaters"] = "Cheater detector", ["Alertas de suspeitos"] = "Suspect alerts",
+    ["Marcar suspeitos (ESP vermelho)"] = "Mark suspects (red ESP)",
+    ["Tolerância de velocidade"] = "Speed tolerance", ["Limpar flags"] = "Clear flags",
+    ["Copiar relatório"] = "Copy report", ["Relatório"] = "Report", ["Flags limpas"] = "Flags cleared",
+    ["Nenhum suspeito"] = "No suspects", ["Suspeito"] = "Suspect",
+    ["Velocidade anormal"] = "Abnormal speed", ["Voo"] = "Flying", ["Teleporte súbito"] = "Sudden teleport",
+    ["Pulo anormal"] = "Abnormal jump", ["Monitorando: "] = "Monitoring: ",
+    [" jogadores  |  Suspeitos: "] = " players  |  Suspects: ", [" é suspeito: "] = " is suspect: ",
+    ["Detecção local: pode haver falso positivo (carros, teleports do jogo, lag)."] =
+        "Local detection: false positives are possible (vehicles, game teleports, lag).",
     -- avisos (toasts)
     ["Jogador não encontrado"] = "Player not found", ["Vendo: "] = "Viewing: ",
     ["Nenhum jogador disponível"] = "No players available", ["Posição salva"] = "Position saved",
@@ -275,8 +276,6 @@ end
 local parent = getGuiParent()
 local old = parent:FindFirstChild("OkkotsuHub")
 if old then old:Destroy() end
-local oldBlur = Lighting:FindFirstChild("OkkBlur")
-if oldBlur then oldBlur:Destroy() end
 
 local gui = new("ScreenGui", {
     Name = "OkkotsuHub",
@@ -284,186 +283,6 @@ local gui = new("ScreenGui", {
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
     IgnoreGuiInset = true,
 }, parent)
-
--- Blur de fundo (usado na tela de key)
-local blur
-local function setBlur(size)
-    if not blur then blur = new("BlurEffect", {Name = "OkkBlur", Size = 0}, Lighting) end
-    tween(blur, 0.5, {Size = size})
-end
-local function clearBlur()
-    if blur then
-        local b = blur
-        blur = nil
-        tween(b, 0.4, {Size = 0})
-        task.delay(0.45, function() b:Destroy() end)
-    end
-end
-
-----------------------------------------------------------------
--- Sistema de key (bloqueia o resto do script até validar)
-----------------------------------------------------------------
-do
-    local VALID_KEY  = "GLOBAL_866328948"
-    local EXPIRES_AT = 1792906284 -- 25/10/2026 02:31:24 (Brasília) = exatamente 1 semana depois
-
-    if not PRIVILEGED[LP.UserId] then
-
-    local function nowTime()
-        local ok, t = pcall(function() return workspace:GetServerTimeNow() end)
-        if ok and type(t) == "number" then return t end
-        return os.time()
-    end
-
-    setBlur(18)
-
-    local kwrap = new("Frame", {
-        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
-        Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1, ZIndex = 300,
-    }, gui)
-    shadow(kwrap, 300)
-    local card = new("Frame", {
-        Size = UDim2.fromScale(1, 1), BackgroundColor3 = THEME.Bg, BorderSizePixel = 0,
-        ClipsDescendants = true, ZIndex = 301,
-    }, kwrap)
-    corner(card, 16)
-    gradient(stroke(card, Color3.new(1, 1, 1), 1, 0.4), THEME.Accent, THEME.Accent2, 45)
-    gradient(card, Color3.fromRGB(20, 17, 32), Color3.fromRGB(11, 11, 17), 90)
-
-    local banner = new("Frame", {Size = UDim2.new(1, 0, 0, 84), BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.8, BorderSizePixel = 0}, card)
-    gradient(banner, THEME.Accent, THEME.Accent2, 25)
-    local langBtn = new("TextButton", {
-        AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 12), Size = UDim2.fromOffset(58, 22),
-        BackgroundColor3 = THEME.Panel2, Text = "🌐 " .. lang:upper(), TextColor3 = THEME.Text,
-        Font = Enum.Font.GothamBold, TextSize = 11, AutoButtonColor = false,
-    }, card)
-    corner(langBtn, 8)
-    hover(langBtn, THEME.Panel2, THEME.Panel3)
-    langBtn.MouseButton1Click:Connect(function()
-        setLang(lang == "pt" and "en" or "pt")
-        langBtn.Text = "🌐 " .. lang:upper()
-    end)
-    local logo = new("TextLabel", {
-        Position = UDim2.fromOffset(20, 20), Size = UDim2.fromOffset(44, 44), BackgroundColor3 = Color3.new(1, 1, 1),
-        Text = "◈", TextColor3 = Color3.new(1, 1, 1), Font = Enum.Font.GothamBold, TextSize = 26,
-    }, card)
-    corner(logo, 12)
-    gradient(logo, THEME.Accent, THEME.Accent2, 45)
-    new("TextLabel", {
-        Position = UDim2.fromOffset(76, 20), Size = UDim2.new(1, -90, 0, 24), BackgroundTransparency = 1,
-        Text = "Okkotsu Hub", TextColor3 = THEME.Text, Font = Enum.Font.GothamBold, TextSize = 19,
-        TextXAlignment = Enum.TextXAlignment.Left,
-    }, card)
-    new("TextLabel", {
-        Position = UDim2.fromOffset(76, 44), Size = UDim2.new(1, -90, 0, 18), BackgroundTransparency = 1,
-        Text = "Universal Version  •  Verificação de key", TextColor3 = THEME.Sub, Font = Enum.Font.GothamMedium,
-        TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left,
-    }, card)
-
-    local info = new("TextLabel", {
-        Position = UDim2.fromOffset(20, 98), Size = UDim2.new(1, -40, 0, 18), BackgroundTransparency = 1,
-        Text = "Digite sua key para continuar", TextColor3 = THEME.Sub,
-        Font = Enum.Font.GothamMedium, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left,
-    }, card)
-    local input = new("TextBox", {
-        Position = UDim2.fromOffset(20, 122), Size = UDim2.new(1, -40, 0, 38), BackgroundColor3 = THEME.Panel,
-        Text = "", PlaceholderText = "🔑  Cole sua key aqui", PlaceholderColor3 = THEME.Sub, TextColor3 = THEME.Text,
-        Font = Enum.Font.GothamMedium, TextSize = 13, ClearTextOnFocus = false, TextXAlignment = Enum.TextXAlignment.Left,
-    }, card)
-    corner(input, 10)
-    new("UIPadding", {PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12)}, input)
-    local inStroke = stroke(input, THEME.Accent, 1, 1)
-    input.Focused:Connect(function() tween(inStroke, 0.2, {Transparency = 0.2}) end)
-    input.FocusLost:Connect(function() tween(inStroke, 0.2, {Transparency = 1}) end)
-
-    local confirm = new("TextButton", {
-        Position = UDim2.fromOffset(20, 172), Size = UDim2.new(0.5, -26, 0, 36), BackgroundColor3 = Color3.new(1, 1, 1),
-        Text = "Validar", TextColor3 = Color3.new(1, 1, 1), Font = Enum.Font.GothamBold, TextSize = 13, AutoButtonColor = false,
-    }, card)
-    corner(confirm, 10)
-    gradient(confirm, THEME.Accent, THEME.Accent2, 20)
-    confirm.MouseEnter:Connect(function() tween(confirm, 0.15, {BackgroundTransparency = 0.12}) end)
-    confirm.MouseLeave:Connect(function() tween(confirm, 0.15, {BackgroundTransparency = 0}) end)
-    local cancel = new("TextButton", {
-        AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -20, 0, 172), Size = UDim2.new(0.5, -26, 0, 36),
-        BackgroundColor3 = THEME.Panel2, Text = "Cancelar", TextColor3 = THEME.Text,
-        Font = Enum.Font.GothamBold, TextSize = 13, AutoButtonColor = false,
-    }, card)
-    corner(cancel, 10)
-    hover(cancel, THEME.Panel2, THEME.Panel3)
-
-    local getKey = new("TextButton", {
-        Position = UDim2.fromOffset(20, 220), Size = UDim2.new(1, -40, 0, 32), BackgroundColor3 = THEME.Panel,
-        Text = "💬  Pegar a key no Discord (copiar link)", TextColor3 = THEME.Accent,
-        Font = Enum.Font.GothamMedium, TextSize = 12, AutoButtonColor = false,
-    }, card)
-    corner(getKey, 10)
-    hover(getKey, THEME.Panel, THEME.Panel2)
-    getKey.MouseButton1Click:Connect(function()
-        local fn = setclipboard or toclipboard
-        if fn then
-            pcall(fn, "https://discord.gg/J9Z9N6qsEc")
-            info.Text = T("Link copiado! A key está no chat do Discord")
-            info.TextColor3 = THEME.Sub
-        else
-            info.Text = "https://discord.gg/J9Z9N6qsEc"
-            info.TextColor3 = THEME.Sub
-        end
-    end)
-
-    tween(kwrap, 0.45, {Size = UDim2.fromOffset(360, 272)}, Enum.EasingStyle.Back)
-
-    local function shake()
-        for _, dx in ipairs({9, -9, 6, -6, 0}) do
-            tween(kwrap, 0.05, {Position = UDim2.new(0.5, dx, 0.5, 0)})
-            task.wait(0.05)
-        end
-    end
-
-    local result = nil -- true = liberado | false = cancelado/expirado
-    local function submit()
-        if nowTime() >= EXPIRES_AT then
-            info.Text = T("Esta key expirou.")
-            info.TextColor3 = THEME.Bad
-            shake()
-            task.wait(1.2)
-            result = false
-            return
-        end
-        if input.Text:gsub("^%s+", ""):gsub("%s+$", "") == VALID_KEY then
-            info.Text = T("Key válida!")
-            info.TextColor3 = THEME.Good
-            task.wait(0.6)
-            result = true
-        else
-            info.Text = T("Key inválida")
-            info.TextColor3 = THEME.Bad
-            shake()
-        end
-    end
-    confirm.MouseButton1Click:Connect(submit)
-    input.FocusLost:Connect(function(enter) if enter then submit() end end)
-    cancel.MouseButton1Click:Connect(function() result = false end)
-
-    if nowTime() >= EXPIRES_AT then
-        info.Text = T("Esta key expirou.")
-        info.TextColor3 = THEME.Bad
-    end
-
-    while result == nil and gui.Parent do task.wait(0.1) end
-
-    if result ~= true then
-        clearBlur()
-        gui:Destroy()
-        return
-    end
-
-    tween(kwrap, 0.3, {Size = UDim2.fromOffset(0, 0)}, Enum.EasingStyle.Back, Enum.EasingDirection.In)
-    task.wait(0.35)
-    kwrap:Destroy()
-
-    end -- fim da checagem de privilégio
-end
 
 ----------------------------------------------------------------
 -- Estado
@@ -840,11 +659,11 @@ local TAB_ALIAS = {
 }
 local TAB_ORDER = {
     ["Jogador"] = 1, ["Teleporte"] = 2, ["Visual"] = 3, ["Mundo"] = 4,
-    ["Aparência"] = 5, ["Música"] = 6, ["Misc"] = 7, ["Discord"] = 8,
+    ["Aparência"] = 5, ["Música"] = 6, ["Misc"] = 7, ["Anti-Cheat"] = 8, ["Discord"] = 9,
 }
 local TAB_ICON = {
     ["Buscar"] = "🔍", ["Jogador"] = "🏃", ["Teleporte"] = "📍", ["Visual"] = "👁", ["Mundo"] = "🌍",
-    ["Aparência"] = "✨", ["Música"] = "🎵", ["Misc"] = "⚙", ["Discord"] = "💬",
+    ["Aparência"] = "✨", ["Música"] = "🎵", ["Misc"] = "⚙", ["Anti-Cheat"] = "🛡", ["Discord"] = "💬",
 }
 
 local function createTab(name)
@@ -1862,7 +1681,7 @@ do
 end
 
 ----------------------------------------------------------------
--- NOVO - Tag: jogadores verificados (PRIVILEGED) ficam azuis.
+-- NOVO - Tag: jogadores verificados (VERIFIED) ficam azuis.
 -- Quem estiver usando o hub vê os jogadores verificados com o efeito azul
 -- (o efeito é local: roda no cliente de cada pessoa que tem o hub).
 ----------------------------------------------------------------
@@ -1887,7 +1706,7 @@ do
 
     local function applyTag(p)
         clearTag(p)
-        if not tagOn or not PRIVILEGED[p.UserId] then return end
+        if not tagOn or not VERIFIED[p.UserId] then return end
         local char = p.Character
         if not char then return end
         local made = {}
@@ -2171,6 +1990,267 @@ do
 end
 
 ----------------------------------------------------------------
+-- NOVO - ABA: Anti-Cheat (detector de cheaters)
+-- Monitora os OUTROS jogadores e marca quem se move de forma
+-- impossível (velocidade, voo, teleporte, pulo). Roda no seu cliente,
+-- então pode haver falso positivo (carros, teleports do jogo, lag).
+----------------------------------------------------------------
+do
+  local __ok, __err = pcall(function()
+    local t = createTab("Anti-Cheat")
+    Section(t, "Anti-Cheat — detector de cheaters")
+
+    local cfg = {on = true, alerts = true, mark = false, maxSpeed = 60}
+    local data = {}               -- [player] = estado de monitoramento
+    local STRIKES_TO_FLAG = 3     -- ocorrências dentro da janela para marcar
+    local WINDOW   = 12           -- segundos que cada ocorrência conta
+    local FLAG_TTL = 90           -- segundos até a marca expirar sem novas ocorrências
+    local FLAG_NAMES = {
+        speed = "Velocidade anormal", fly = "Voo",
+        tp = "Teleporte súbito", jump = "Pulo anormal",
+    }
+
+    local setOn     = Toggle(t, "Detector de cheaters", function(v) cfg.on = v end)
+    local setAlerts = Toggle(t, "Alertas de suspeitos", function(v) cfg.alerts = v end)
+    Toggle(t, "Marcar suspeitos (ESP vermelho)", function(v) cfg.mark = v end)
+    Slider(t, "Tolerância de velocidade", 30, 200, cfg.maxSpeed, function(v) cfg.maxSpeed = v end)
+    setOn(true)
+    setAlerts(true)
+
+    new("TextLabel", {
+        Size = UDim2.new(1, 0, 0, 32), BackgroundTransparency = 1, TextWrapped = true,
+        Text = "Detecção local: pode haver falso positivo (carros, teleports do jogo, lag).",
+        TextColor3 = THEME.Sub, Font = Enum.Font.GothamMedium, TextSize = 11,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, t)
+
+    local header = new("TextLabel", {
+        Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Text = "",
+        TextColor3 = THEME.Accent, Font = Enum.Font.GothamBold, TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, t)
+
+    local holder = new("Frame", {Size = UDim2.new(1, 0, 0, 150), BackgroundColor3 = THEME.Panel, BorderSizePixel = 0}, t)
+    corner(holder, 10)
+    stroke(holder, Color3.new(1, 1, 1), 1, 0.93)
+    local list = new("ScrollingFrame", {
+        Position = UDim2.fromOffset(6, 6), Size = UDim2.new(1, -12, 1, -12),
+        BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3,
+        ScrollBarImageColor3 = THEME.Accent, CanvasSize = UDim2.new(),
+        AutomaticCanvasSize = Enum.AutomaticSize.Y,
+    }, holder)
+    new("UIListLayout", {Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder}, list)
+
+    local marks = new("Folder", {Name = "SuspectMarks"}, gui)
+    local rows = {}
+
+    local function newState() return {hits = {}, flags = {}, air = 0, t = 0} end
+
+    local function flagText(st)
+        local out = {}
+        for k in pairs(st.flags) do out[#out + 1] = T(FLAG_NAMES[k]) end
+        table.sort(out)
+        return table.concat(out, ", ")
+    end
+
+    local function strike(st, kind, now)
+        st.hits[#st.hits + 1] = {t = now, k = kind}
+    end
+
+    -- Coleta uma amostra de movimento do jogador
+    local function sample(p, st, now, rp)
+        local char = p.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if not hrp or not hum or hum.Health <= 0 then
+            st.pos, st.air = nil, 0
+            return
+        end
+        if st.char ~= char then -- renasceu: ignora os primeiros segundos
+            st.char, st.pos, st.air, st.grace = char, nil, 0, now + 3
+        end
+        local pos = hrp.Position
+        if st.pos and now > (st.grace or 0) then
+            local dt = now - st.t
+            local seated = hum.Sit or hum.SeatPart ~= nil
+            if dt > 0.05 and not seated then
+                local d = pos - st.pos
+                local total = d.Magnitude / dt
+                local horiz = Vector3.new(d.X, 0, d.Z).Magnitude / dt
+                if total > 350 then
+                    strike(st, "tp", now)
+                elseif horiz > cfg.maxSpeed then
+                    strike(st, "speed", now)
+                end
+
+                local vy = hrp.AssemblyLinearVelocity.Y
+                if vy > 110 then strike(st, "jump", now) end
+
+                -- voo: no ar (sem chão por perto) e quase sem velocidade vertical
+                local ground = workspace:Raycast(pos, Vector3.new(0, -8, 0), rp)
+                if ground == nil and math.abs(vy) < 4 then
+                    st.air += dt
+                    if st.air > 2 then
+                        strike(st, "fly", now)
+                        st.air = 0
+                    end
+                else
+                    st.air = 0
+                end
+            else
+                st.air = 0
+            end
+        end
+        st.pos, st.t = pos, now
+    end
+
+    -- Converte as ocorrências em marcas (flags) e avisa quando surge uma nova
+    local function evaluate(p, st, now)
+        local keep, counts = {}, {}
+        for _, h in ipairs(st.hits) do
+            if now - h.t <= WINDOW then
+                keep[#keep + 1] = h
+                counts[h.k] = (counts[h.k] or 0) + 1
+            end
+        end
+        st.hits = keep
+        for k, c in pairs(counts) do
+            local need = (k == "tp") and 2 or STRIKES_TO_FLAG
+            if c >= need then
+                if not st.flags[k] and cfg.alerts then
+                    notify(p.DisplayName .. T(" é suspeito: ") .. T(FLAG_NAMES[k]))
+                end
+                st.flags[k] = now
+            end
+        end
+        for k, tt in pairs(st.flags) do
+            if now - tt > FLAG_TTL then st.flags[k] = nil end
+        end
+    end
+
+    local function ensureRow(p)
+        if rows[p] then return rows[p] end
+        local b = new("TextButton", {
+            Size = UDim2.new(1, -6, 0, 28), BackgroundColor3 = THEME.Panel2, Text = "",
+            TextColor3 = THEME.Text, Font = Enum.Font.GothamMedium, TextSize = 12,
+            AutoButtonColor = false, TextXAlignment = Enum.TextXAlignment.Left,
+            TextTruncate = Enum.TextTruncate.AtEnd,
+        }, list)
+        corner(b, 8)
+        new("UIPadding", {PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 8)}, b)
+        b.MouseButton1Click:Connect(function()
+            local st = data[p]
+            local txt = (st and next(st.flags)) and flagText(st) or "Normal"
+            notify(p.DisplayName .. ": " .. txt)
+        end)
+        rows[p] = b
+        return b
+    end
+
+    local function removePlayer(p)
+        data[p] = nil
+        if rows[p] then rows[p]:Destroy() rows[p] = nil end
+        local m = marks:FindFirstChild(p.Name)
+        if m then m:Destroy() end
+    end
+
+    local function refreshUI()
+        local total, sus = 0, 0
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LP then
+                total += 1
+                local st = data[p]
+                local b = ensureRow(p)
+                local flagged = st ~= nil and next(st.flags) ~= nil
+                if flagged then sus += 1 end
+                local txt
+                if flagged then
+                    txt = p.DisplayName .. "  •  ⚠ " .. T("Suspeito") .. ": " .. flagText(st)
+                else
+                    txt = p.DisplayName .. "  •  ✅ Normal"
+                end
+                if b.Text ~= txt then b.Text = txt end
+                b.TextColor3 = flagged and THEME.Bad or THEME.Text
+                b.LayoutOrder = flagged and 0 or 1
+
+                local m = marks:FindFirstChild(p.Name)
+                if flagged and cfg.mark and p.Character then
+                    if not m or m.Adornee ~= p.Character then
+                        if m then m:Destroy() end
+                        new("Highlight", {
+                            Name = p.Name, Adornee = p.Character, FillColor = Color3.fromRGB(255, 60, 60),
+                            OutlineColor = Color3.new(1, 1, 1), FillTransparency = 0.5,
+                            DepthMode = Enum.HighlightDepthMode.AlwaysOnTop,
+                        }, marks)
+                    end
+                elseif m then
+                    m:Destroy()
+                end
+            end
+        end
+        header.Text = T("Monitorando: ") .. total .. T(" jogadores  |  Suspeitos: ") .. sus
+    end
+
+    connect(Players.PlayerRemoving, removePlayer)
+
+    task.spawn(function()
+        local rp = RaycastParams.new()
+        rp.FilterType = Enum.RaycastFilterType.Exclude
+        while gui.Parent do
+            pcall(function()
+                if cfg.on then
+                    local now = os.clock()
+                    local chars = {}
+                    for _, p in ipairs(Players:GetPlayers()) do
+                        if p.Character then chars[#chars + 1] = p.Character end
+                    end
+                    rp.FilterDescendantsInstances = chars
+                    for _, p in ipairs(Players:GetPlayers()) do
+                        if p ~= LP then
+                            local st = data[p]
+                            if not st then st = newState() data[p] = st end
+                            sample(p, st, now, rp)
+                            evaluate(p, st, now)
+                        end
+                    end
+                end
+                refreshUI()
+            end)
+            task.wait(0.25)
+        end
+    end)
+
+    Button(t, "Limpar flags", function()
+        for _, st in pairs(data) do
+            st.hits, st.flags = {}, {}
+        end
+        notify("Flags limpas")
+    end)
+
+    Button(t, "Copiar relatório", function()
+        local lines = {}
+        for p, st in pairs(data) do
+            if next(st.flags) then
+                lines[#lines + 1] = string.format("%s (@%s): %s", p.DisplayName, p.Name, flagText(st))
+            end
+        end
+        if #lines == 0 then return notify("Nenhum suspeito") end
+        table.sort(lines)
+        copy(table.concat(lines, "\n"), "Relatório")
+    end)
+
+    onCleanup(function()
+        cfg.on = false
+        marks:ClearAllChildren()
+    end)
+  end)
+  if not __ok then
+    warn("[Okkotsu Hub] erro no Anti-Cheat: " .. tostring(__err))
+    notify("Erro no Anti-Cheat (F9)")
+  end
+end
+
+----------------------------------------------------------------
 -- Aba: Buscar (primeira da barra lateral)
 ----------------------------------------------------------------
 do
@@ -2318,7 +2398,6 @@ local function doClose()
     if h then h.WalkSpeed, h.JumpPower = 16, 50 workspace.CurrentCamera.CameraSubject = h end
     if S.fullbright then for k, val in pairs(origLight) do Lighting[k] = val end end
     for _, c in ipairs(connections) do c:Disconnect() end
-    clearBlur()
     gui:Destroy()
 end
 
@@ -2441,7 +2520,6 @@ do
         task.wait(0.28)
     end
 
-    clearBlur()
     tween(overlay, 0.4, {BackgroundTransparency = 1})
     for _, o in ipairs({title, sub, status, logo}) do tween(o, 0.35, {TextTransparency = 1}) end
     tween(logo, 0.35, {BackgroundTransparency = 1})
