@@ -21,7 +21,7 @@ local LP       = Players.LocalPlayer
 -- Coloque o UserId (número da conta), um por linha, no formato:  [123456789] = true,
 local VERIFIED = {
      [4427424158] = true,
-     --[SEU_USERID_AQUI] = true,
+     [8565124596] = true,
 }
 
 local THEME = {
